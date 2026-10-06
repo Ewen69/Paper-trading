@@ -61,6 +61,11 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   - Dry run is the default.
   - `AlpacaPaperBroker` re-asserts the paper URL before each submit.
   - Log tables are append-only (DB triggers).
+- Net worth (`ptl/networth`, frontend `src/networth`):
+  - Amounts are integer cents.
+  - Balances are carried forward, never interpolated.
+  - Projections are labeled assumptions and are refused for net worth of zero or less.
+  - Agents and HQ never show net-worth amounts.
 - Commits use the GitHub no-reply email (the repo is public).
 
 ## Commands (run from repo root)
@@ -68,7 +73,8 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
 - `npm install` — first-time setup (installs root tools, runs `uv sync` and frontend install).
 - `npm run dev` — start backend (:8000) and frontend (:5173) together.
 - `npm run ptl -- <command>` — CLI (`import-csv`, `datasets`, `delete-dataset`, `paper-cycle`,
-  `kill-switch`); see `docs/DATA.md` and `docs/AGENTS.md`.
+  `kill-switch`, `networth-import`, `networth-export`); see `docs/DATA.md`, `docs/AGENTS.md`
+  and `docs/NETWORTH.md`.
 - `npm run check` — ruff, ruff format check, mypy, pytest, ESLint, tsc, Vitest. Must be clean
   (zero warnings) before any commit.
 

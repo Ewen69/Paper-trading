@@ -245,6 +245,29 @@ MIGRATIONS: tuple[str, ...] = (
     CREATE TRIGGER agent_findings_no_delete BEFORE DELETE ON agent_findings
     BEGIN SELECT RAISE(ABORT, 'agent findings are append-only'); END;
     """,
+    # 6: net worth, entered by hand or from CSV. Amounts are non-negative cents; the account's
+    # kind decides the sign. One balance per account per date (a re-entry replaces it).
+    """
+    CREATE TABLE nw_accounts (
+        id         INTEGER PRIMARY KEY,
+        name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        kind       TEXT NOT NULL CHECK (kind IN ('asset', 'liability')),
+        category   TEXT NOT NULL,
+        note       TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE nw_balances (
+        id           INTEGER PRIMARY KEY,
+        account_id   INTEGER NOT NULL REFERENCES nw_accounts (id) ON DELETE CASCADE,
+        as_of        TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
+        source       TEXT NOT NULL,
+        entered_at   TEXT NOT NULL,
+        UNIQUE (account_id, as_of)
+    );
+    CREATE INDEX nw_balances_by_date ON nw_balances (as_of);
+    """,
 )
 
 

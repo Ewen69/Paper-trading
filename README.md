@@ -6,11 +6,44 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 3 (live agents, risk engine, paper runner)
+## Status: Phase 4 (net worth tracker)
 
-Next: Phase 4 (net worth tracker). See [`docs/PLAN.md`](docs/PLAN.md).
+Next: Phase 5 (portfolio analysis). See [`docs/PLAN.md`](docs/PLAN.md).
 
-### What Phase 3 adds
+### What Phase 4 adds
+
+Details: [`docs/NETWORTH.md`](docs/NETWORTH.md).
+
+- **Net Worth station (key 6), run by the Accountant.** You add accounts (asset or liability,
+  with a category) and dated balances by hand.
+  - There are no bank logins, and everything stays in local SQLite.
+  - The Accountant's HQ card shows counts and dates, never amounts.
+- **Net worth = assets minus liabilities:**
+  - each account's latest balance on or before the date, carried forward and never
+    interpolated
+  - accounts with no balance count as 0 and are listed
+  - balances older than 45 days are flagged stale
+- **History chart:** one point per entry date. The tooltip shows assets, liabilities, carried
+  values and missing accounts.
+- **CSV import and export** (`account,kind,category,as_of,amount`). Imports are all-or-nothing,
+  with every bad line listed, and exports round-trip.
+  - In the UI, or with `npm run ptl -- networth-import` / `networth-export`.
+- **Projection range:**
+  - low and high fixed rates (defaults 4%–6%), optional yearly contribution, up to 50 years
+  - labeled as an assumption, not a forecast
+  - refused when net worth is zero or negative
+- **Exact storage:** amounts are integer cents, and future dates are refused. Re-entering a
+  date replaces the old balance, and the app says so.
+
+### Phase 4 limitations
+
+- USD only.
+- Holdings aren't priced automatically; a brokerage account is the balance you enter.
+  Merging paper positions with holdings is Phase 5.
+- Debts don't accrue interest between entries.
+- Projections use one fixed rate per line, with no volatility.
+
+### What Phase 3 added
 
 Details: [`docs/AGENTS.md`](docs/AGENTS.md).
 

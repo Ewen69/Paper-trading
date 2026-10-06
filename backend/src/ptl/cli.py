@@ -1,4 +1,5 @@
-"""Command-line tools: import-csv, datasets, delete-dataset, paper-cycle, kill-switch.
+"""Command-line tools: import-csv, datasets, delete-dataset, paper-cycle, kill-switch,
+networth-import, networth-export.
 
 Run from the repo root as `npm run ptl -- <command> ...`.
 """
@@ -22,6 +23,7 @@ from ptl.data.csv_ingest import (
 from ptl.data.models import DatasetKind
 from ptl.db import migrate, open_db
 from ptl.market_calendar import MarketCalendar
+from ptl.networth import csvio as nw_csv
 from ptl.paper.factory import broker_factory
 from ptl.paper.runner import CycleRefusedError, CycleRequest, run_cycle
 from ptl.provenance import DataType
@@ -85,6 +87,11 @@ def _parser() -> argparse.ArgumentParser:
     kill = sub.add_parser("kill-switch", help="engage or release the risk kill switch")
     kill.add_argument("state", choices=["on", "off"])
     kill.add_argument("--reason", required=True)
+
+    nw_in = sub.add_parser("networth-import", help="import net-worth balances from CSV")
+    nw_in.add_argument("path", type=Path)
+    nw_out = sub.add_parser("networth-export", help="export all net-worth balances to CSV")
+    nw_out.add_argument("path", type=Path)
     return parser
 
 
@@ -185,12 +192,38 @@ def _delete(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
     return 1
 
 
+def _networth_import(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
+    path: Path = args.path.expanduser().resolve()
+    if not path.is_file():
+        _out(f"error: file not found: {path}")
+        return 2
+    try:
+        r = nw_csv.import_csv(conn, path.read_text(encoding="utf-8"), path.name, datetime.now(UTC))
+    except nw_csv.CsvRejectedError as exc:
+        _out(str(exc))
+        return 1
+    _out(
+        f"Imported {r.rows} balance(s): {r.inserted} new, {r.updated} replaced, "
+        f"{r.accounts_created} account(s) created. Source: {r.source}"
+    )
+    return 0
+
+
+def _networth_export(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
+    path: Path = args.path.expanduser().resolve()
+    path.write_text(nw_csv.export_csv(conn), encoding="utf-8")
+    _out(f"Wrote {path}. It contains your net-worth data; keep it private.")
+    return 0
+
+
 _COMMANDS = {
     "import-csv": _import,
     "datasets": _list,
     "delete-dataset": _delete,
     "paper-cycle": _paper_cycle,
     "kill-switch": _kill_switch,
+    "networth-import": _networth_import,
+    "networth-export": _networth_export,
 }
 
 

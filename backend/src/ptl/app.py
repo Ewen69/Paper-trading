@@ -24,6 +24,7 @@ from ptl.db import migrate, open_db
 from ptl.game import build_game_router
 from ptl.health import build_health_router
 from ptl.market_calendar import MarketCalendar
+from ptl.networth_api import build_networth_router
 from ptl.paper.factory import broker_factory
 from ptl.safety import assert_paper_endpoint
 
@@ -86,4 +87,5 @@ def create_app(
     app.include_router(build_data_router(settings, source, calendar, clock))
     app.include_router(build_backtest_router(settings, calendar, clock))
     app.include_router(build_game_router(settings, source, calendar, clock))
+    app.include_router(build_networth_router(settings, clock))
     return app
