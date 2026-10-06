@@ -45,6 +45,12 @@ class PutCreditSpread(OptionStrategy):
         ParamSpec("take_profit", "Take profit (% of credit)", 50, 0, 100, "0 = hold."),
         ParamSpec("max_open", "Max open spreads", 1, 1, 10, "At a time."),
     )
+    search_space: ClassVar[dict[str, tuple[int, int]]] = {
+        "dte": (14, 60),
+        "otm_percent": (1, 15),
+        "width": (1, 20),
+        "take_profit": (0, 90),
+    }
     sweep_grid: ClassVar[dict[str, list[int]]] = {
         "dte": [30, 45],
         "otm_percent": [3, 5, 8],

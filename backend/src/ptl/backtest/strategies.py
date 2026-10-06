@@ -86,6 +86,7 @@ class SmaCrossover(EquityStrategy):
         ParamSpec("slow", "Slow window", 200, 3, 400, "Sessions in the slow average."),
     )
     sweep_grid: ClassVar[dict[str, list[int]]] = {"fast": [10, 20, 50], "slow": [100, 150, 200]}
+    search_space: ClassVar[dict[str, tuple[int, int]]] = {"fast": (5, 100), "slow": (20, 300)}
 
     def __init__(self, fast: int, slow: int) -> None:
         if fast >= slow:

@@ -111,7 +111,7 @@ Badges:
   weights.
 - The Accountant reports net-worth account counts, the latest entry date and stale accounts,
   never amounts.
-- Risk Officer and Paper Trader report on HQ. Their live status and controls are in the City
+- Risk Officer and Paper Trader report on HQ. Their live status and controls are in the Operations Center
   (`docs/AGENTS.md`).
 - Runs logged before this phase have no stored warnings or CIs. The Auditor and the gate treat
   them as unknown, never as clean.

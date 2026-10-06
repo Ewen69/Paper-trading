@@ -9,6 +9,9 @@
     "dev:api": "uv --directory backend run uvicorn ptl.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir src",
     "dev:web": "npm run dev --prefix frontend",
     "ptl": "uv run --project backend ptl",
+    "start:all": "uv --directory backend run python -m ptl.orchestrator",
+    "optimizer": "uv --directory backend run python -m ptl.agents.optimizer",
+    "runner": "uv --directory backend run python -m ptl.runner",
     "check": "npm run check:api && npm run check:web",
     "check:api": "uv --directory backend run ruff check --no-cache . &&uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
     "check:web": "npm run typecheck --prefix frontend && npm run lint --prefix frontend && npm run test --prefix frontend"

@@ -9,6 +9,7 @@ LIMITS = RiskLimits(
     max_daily_loss=2_000,
     max_open_positions=3,
     max_capital_at_risk_pct=0.5,
+    max_position_pct=0.25,
 )
 ACCOUNT = AccountSnapshot(equity=10_000, day_pnl=-150, open_positions=1, capital_at_risk=2_000)
 BUY = ProposedOrder(
@@ -18,6 +19,7 @@ BUY = ProposedOrder(
     max_loss=600,
     defined_risk=True,
     new_position=True,
+    position_value_after=600,
 )
 
 
@@ -46,6 +48,8 @@ def test_each_limit_rejects() -> None:
     assert failed(replace(BUY, new_position=False), replace(ACCOUNT, open_positions=3)) == []
     assert failed(BUY, replace(ACCOUNT, capital_at_risk=4_500)) == ["max_capital_at_risk"]
     assert failed(replace(BUY, defined_risk=False)) == ["defined_risk"]
+    # 2,500.01 > 25% x 10,000 = 2,500
+    assert failed(replace(BUY, position_value_after=2_500.01)) == ["max_position_size"]
 
 
 def test_daily_loss_breach_rejects_and_trips_the_kill_switch() -> None:

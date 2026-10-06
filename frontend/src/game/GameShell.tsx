@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchGameState } from '../api/client';
 import type { Agent, GameEvent, GameState } from '../api/schemas';
 import { useApi, type ApiState } from '../api/useApi';
-import { CityPage } from '../city/CityPage';
 import { NetWorthPage } from '../networth/NetWorthPage';
+import { OpsCenter } from '../ops/OpsCenter';
 import { PortfolioPage } from '../portfolio/PortfolioPage';
 import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
@@ -16,7 +16,7 @@ import { timeOf } from './status';
 import { StatusChip } from './StatusChip';
 
 const STATIONS = [
-  { id: 'city', key: '1', label: 'City', agent: null, icon: '🏙' },
+  { id: 'ops', key: '1', label: 'Ops Center', agent: null, icon: '📡' },
   { id: 'hq', key: '2', label: 'HQ', agent: null, icon: '🏠' },
   { id: 'data-health', key: '3', label: 'Data Scout', agent: 'scout', icon: null },
   { id: 'strategy-lab', key: '4', label: 'Quant', agent: 'quant', icon: null },
@@ -27,7 +27,7 @@ const STATIONS = [
 type StationId = (typeof STATIONS)[number]['id'];
 
 const stationFromHash = (): StationId =>
-  STATIONS.find((s) => `#${s.id}` === window.location.hash)?.id ?? 'city';
+  STATIONS.find((s) => `#${s.id}` === window.location.hash)?.id ?? 'ops';
 
 const eventKey = (e: GameEvent) => `${e.at.toISOString()}|${e.kind}|${e.text}`;
 
@@ -238,13 +238,13 @@ export function GameShell() {
   const stationAgent = agents.find((a) => a.station === station);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4">
+    <div className={`mx-auto px-4 py-4 ${station === 'ops' ? 'max-w-[1700px]' : 'max-w-6xl'}`}>
       <Hud game={game} />
       <Hotbar current={station} agents={agents} />
       <main>
         {station === 'hq' && <HQPage game={game} />}
-        {station === 'city' && <CityPage />}
-        {station !== 'hq' && station !== 'city' && <StationHeader agent={stationAgent} />}
+        {station === 'ops' && <OpsCenter />}
+        {station !== 'hq' && station !== 'ops' && <StationHeader agent={stationAgent} />}
         {station === 'data-health' && <DataHealthPage />}
         {station === 'strategy-lab' && <StrategyLabPage onActivity={announceActivity} />}
         {station === 'audit' && <AuditPage game={game} />}

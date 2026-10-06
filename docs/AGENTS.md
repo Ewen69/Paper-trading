@@ -2,40 +2,13 @@
 
 Nothing here is advice. Agents run backtests and paper cycles; they don't predict anything.
 
-## The City (default screen)
+## Where to see them
 
-`#city` is an isometric 3D view of the agent system plus DOM panels with the same data.
-
-- **Sectors** are districts:
-  - Data Ingestion
-  - Strategy Research
-  - Options Risk
-  - Execution Hub
-- Each sector has a fixed number of **slots**. Empty slots (outlined squares) are reserved for
-  sub-agents added later. To add one, add an `AgentDef` to `ptl/agents/roster.py` and give it a
-  job kind.
-- **Agent nodes** are a tower with an octahedron colored by status:
-  - sky = running
-  - amber = queued
-  - red = error
-  - indigo = watching
-  - white = idle
-
-  A running node pulses and streams particles. Its floating label shows the exact parameters
-  under test and its progress (for example `In-sample test 3/9: sma_crossover (fast=20,
-  slow=150) on SPY`).
-- **Panels below the view** hold every detail and control:
-  - status, message, progress, parameters, update time and an autopilot toggle
-  - a findings log with run #, trades, win rate and Sharpe
-  - a kill-switch banner
-
-  The 3D view is decoration over the same data. Without WebGL the page says so and still works.
-- **Data path:** everything arrives over `/api/ws/activity`, a WebSocket that sends:
-  - a snapshot first
-  - then `agent`, `finding` and `kill_switch` events
-
-  Every message is validated with zod, and invalid ones are counted and ignored. If the stream
-  drops, the page shows "offline" and reconnects with backoff.
+The 3D City view was removed. Live status, the agent terminal and all controls are now in the
+**Operations Center** ([`docs/OPERATIONS.md`](OPERATIONS.md)). The continuous search is done
+by the learning optimizer daemon ([`docs/OPTIMIZER.md`](OPTIMIZER.md)). The agent runtime below
+still serves manual sweeps, data checks and single paper cycles, and its autopilot is off by
+default.
 
 ## Agents
 
@@ -92,7 +65,7 @@ Every check is stored with its arithmetic.
 | Max open positions | `RISK_MAX_OPEN_POSITIONS=5` |
 | Max capital at risk (fraction of equity) | `RISK_MAX_CAPITAL_AT_RISK_PCT=0.5` |
 
-You can engage or release the kill switch from the City (a reason is required) or with the
+You can engage or release the kill switch from the Operations Center (a reason is required) or with the
 command line: `npm run ptl -- kill-switch on --reason "..."`.
 
 ## Paper runner

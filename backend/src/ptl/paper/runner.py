@@ -6,6 +6,9 @@ Rules:
   is refused rather than trading on a stale signal.
 - Sizing uses whole shares at the live ask (conservative for buys). In dry-run without a live
   quote, the last close is used and labeled as such; paper mode requires a live quote.
+- A buy is sized to the tightest of: the strategy's target, max position size, max loss per
+  trade (a long with no stop can lose its full notional) and the capital-at-risk headroom. The
+  rationale names the binding limit; the risk engine still checks the result.
 - Every cycle, risk decision, order and broker response is written to SQLite.
 """
 
@@ -109,11 +112,25 @@ def run_cycle(  # noqa: PLR0913, PLR0915 - one linear recipe; each step is logge
         price = window[-1].close
         price_source = f"last close {window[-1].session_date} (no live quote; dry run)"
 
-    desired = float(math.floor(target * account.equity / price))
+    limits = risk_store.limits_from(settings)
+    at_risk_now = sum(abs(p.market_value) for p in positions.values())
+    held_value = current * price
+    caps = [
+        ("strategy target", target * account.equity),
+        ("max position size", limits.max_position_pct * account.equity),
+        ("max loss per trade", held_value + limits.max_loss_per_trade),
+        (
+            "capital-at-risk headroom",
+            held_value + max(0.0, limits.max_capital_at_risk_pct * account.equity - at_risk_now),
+        ),
+    ]
+    binding, budget = min(caps, key=lambda c: c[1]) if target > 0 else ("strategy target", 0.0)
+    desired = float(max(0, math.floor(budget / price)))
     delta = desired - current
     sizing = (
         f"Target {target:.0%} of equity ${account.equity:,.2f} ({account.source}) at "
-        f"{price:,.2f} = {desired:g} shares; holding {current:g}."
+        f"{price:,.2f}; sized by {binding} (${budget:,.2f}) = {desired:g} shares; "
+        f"holding {current:g}."
     )
 
     def cycle(outcome: str) -> int:
@@ -148,6 +165,7 @@ def run_cycle(  # noqa: PLR0913, PLR0915 - one linear recipe; each step is logge
         max_loss=qty * price if side == "buy" else 0.0,  # long stock, no stop: notional
         defined_risk=True,  # long only; short stock is never proposed
         new_position=current == 0 and side == "buy",
+        position_value_after=desired * price,
     )
     snapshot = AccountSnapshot(
         equity=account.equity,
@@ -156,7 +174,7 @@ def run_cycle(  # noqa: PLR0913, PLR0915 - one linear recipe; each step is logge
         capital_at_risk=sum(abs(p.market_value) for p in positions.values()),
     )
     switch = risk_store.kill_switch(conn)
-    decision = evaluate(proposed, snapshot, risk_store.limits_from(settings), switch.engaged)
+    decision = evaluate(proposed, snapshot, limits, switch.engaged)
     decision_id = risk_store.record_decision(
         conn, now=now, source=f"paper runner ({broker.mode})", order=proposed, decision=decision
     )

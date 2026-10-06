@@ -1,5 +1,6 @@
 """REST routes for agents, the risk engine, and the paper runner."""
 
+import sqlite3
 from datetime import date
 from typing import Literal
 
@@ -129,6 +130,10 @@ class OrderOut(BaseModel):
     broker_order_id: str | None
     status: str
     latest_status: str
+    quote_price: float | None  # the price the order was sized at (see the cycle's source)
+    fill_price: float | None
+    slippage_per_share: float | None  # positive = worse than the quote
+    slippage_bps: float | None
 
 
 class PaperLogOut(BaseModel):
@@ -297,17 +302,27 @@ def _paper_routes(
                     CycleOut.model_validate(c, from_attributes=True)
                     for c in paper_store.recent_cycles(conn)
                 ],
-                orders=[
-                    OrderOut.model_validate(
-                        _fields(o, OrderOut, latest_status=paper_store.latest_status(conn, o.id))
-                    )
-                    for o in orders
-                ],
+                orders=[_order(conn, o) for o in orders],
             )
 
 
 def _fields(obj: object, model: type[BaseModel], **extra: object) -> dict[str, object]:
     return {k: getattr(obj, k) for k in model.model_fields if k not in extra} | extra
+
+
+def _order(conn: sqlite3.Connection, o: paper_store.OrderRecord) -> OrderOut:
+    ex = paper_store.execution(conn, o)
+    return OrderOut.model_validate(
+        _fields(
+            o,
+            OrderOut,
+            latest_status=paper_store.latest_status(conn, o.id),
+            quote_price=ex.quote_price,
+            fill_price=ex.fill_price,
+            slippage_per_share=ex.slippage_per_share,
+            slippage_bps=ex.slippage_bps,
+        )
+    )
 
 
 def _runner(r: paper_store.RunnerRecord) -> RunnerOut:

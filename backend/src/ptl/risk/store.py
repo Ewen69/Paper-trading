@@ -34,6 +34,7 @@ def limits_from(settings: Settings) -> RiskLimits:
         max_daily_loss=settings.risk_max_daily_loss,
         max_open_positions=settings.risk_max_open_positions,
         max_capital_at_risk_pct=settings.risk_max_capital_at_risk_pct,
+        max_position_pct=settings.risk_max_position_pct,
     )
 
 

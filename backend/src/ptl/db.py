@@ -291,6 +291,83 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK (asset_class = 'option' OR quantity > 0)
     );
     """,
+    # 8: the learning optimizer and background daemons. Trials, Active Best history and daemon
+    # log lines are append-only; heartbeats are a small upserted status table.
+    """
+    CREATE TABLE agent_learning_log (
+        id                 INTEGER PRIMARY KEY,
+        created_at         TEXT NOT NULL,
+        search_id          TEXT NOT NULL,
+        generation         INTEGER NOT NULL,
+        asset              TEXT NOT NULL CHECK (asset IN ('equity', 'options')),
+        strategy           TEXT NOT NULL,
+        symbol             TEXT NOT NULL,
+        dataset_id         INTEGER NOT NULL,
+        options_dataset_id INTEGER,
+        params             TEXT NOT NULL,
+        period             TEXT NOT NULL CHECK (period IN ('in-sample', 'out-of-sample')),
+        run_id             INTEGER,
+        reused             INTEGER NOT NULL,
+        trades             INTEGER,
+        win_rate           REAL,
+        sharpe             REAL,
+        max_drawdown       REAL,
+        total_return       REAL,
+        excess_annualized  REAL,
+        fitness            REAL,
+        verdict            TEXT NOT NULL,
+        note               TEXT NOT NULL
+    );
+    CREATE INDEX agent_learning_log_target ON agent_learning_log (strategy, symbol, period);
+
+    CREATE TABLE optimizer_active_best (
+        id                 INTEGER PRIMARY KEY,
+        created_at         TEXT NOT NULL,
+        search_id          TEXT NOT NULL,
+        asset              TEXT NOT NULL CHECK (asset IN ('equity', 'options')),
+        strategy           TEXT NOT NULL,
+        symbol             TEXT NOT NULL,
+        dataset_id         INTEGER NOT NULL,
+        options_dataset_id INTEGER,
+        params             TEXT NOT NULL,
+        in_sample_fitness  REAL NOT NULL,
+        in_sample_log_id   INTEGER NOT NULL REFERENCES agent_learning_log (id),
+        oos_log_id         INTEGER REFERENCES agent_learning_log (id),
+        validated          INTEGER NOT NULL,
+        reason             TEXT NOT NULL,
+        curve              TEXT NOT NULL
+    );
+
+    CREATE TABLE daemon_log (
+        id         INTEGER PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        daemon     TEXT NOT NULL,
+        level      TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+        message    TEXT NOT NULL
+    );
+
+    CREATE TABLE daemon_heartbeats (
+        daemon     TEXT PRIMARY KEY,
+        pid        INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        beat_at    TEXT NOT NULL,
+        status     TEXT NOT NULL,
+        detail     TEXT NOT NULL
+    );
+
+    CREATE TRIGGER agent_learning_log_no_update BEFORE UPDATE ON agent_learning_log
+    BEGIN SELECT RAISE(ABORT, 'the learning log is append-only'); END;
+    CREATE TRIGGER agent_learning_log_no_delete BEFORE DELETE ON agent_learning_log
+    BEGIN SELECT RAISE(ABORT, 'the learning log is append-only'); END;
+    CREATE TRIGGER optimizer_active_best_no_update BEFORE UPDATE ON optimizer_active_best
+    BEGIN SELECT RAISE(ABORT, 'Active Best history is append-only'); END;
+    CREATE TRIGGER optimizer_active_best_no_delete BEFORE DELETE ON optimizer_active_best
+    BEGIN SELECT RAISE(ABORT, 'Active Best history is append-only'); END;
+    CREATE TRIGGER daemon_log_no_update BEFORE UPDATE ON daemon_log
+    BEGIN SELECT RAISE(ABORT, 'the daemon log is append-only'); END;
+    CREATE TRIGGER daemon_log_no_delete BEFORE DELETE ON daemon_log
+    BEGIN SELECT RAISE(ABORT, 'the daemon log is append-only'); END;
+    """,
 )
 
 

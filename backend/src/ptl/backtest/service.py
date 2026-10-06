@@ -326,8 +326,18 @@ def equity_cost_lines(costs: CostModel) -> list[CostLine]:
 
 
 def run(
-    conn: sqlite3.Connection, request: RunRequest, calendar: MarketCalendar, now: datetime
+    conn: sqlite3.Connection,
+    request: RunRequest,
+    calendar: MarketCalendar,
+    now: datetime,
+    *,
+    record: bool = True,
 ) -> BacktestReport:
+    """Run and log a backtest.
+
+    `record=False` replays a run that is ALREADY in the log (to redraw its curve) without logging
+    it again; it refuses anything not logged, so it can't be used to peek at untried params.
+    """
     spec = STRATEGIES.get(request.strategy_id)
     if spec is None:
         raise BacktestRefusedError(f"Unknown strategy {request.strategy_id!r}.")
@@ -341,6 +351,8 @@ def run(
     symbol = request.symbol.strip().upper()
     dataset = load_dataset(conn, request.dataset_id)
     all_bars = load_bars(conn, dataset.id, symbol)
+    if not record and repo.find_run(conn, symbol, spec.id, params, request.period) is None:
+        raise BacktestRefusedError("Only runs already in the log can be replayed unlogged.")
     lock = repo.get_lock(conn, symbol) or create_lock(conn, dataset.id, symbol, now, bars=all_bars)
     window = resolve_window(all_bars, lock, request.period)
     warnings = quality_gate(window.bars, calendar, symbol)
@@ -375,18 +387,22 @@ def run(
         None if s_ann is None or b_ann is None else s_ann - b_ann, boot.excess_annualized
     )
 
-    run_id = repo.record_run(
-        conn,
-        created_at=now,
-        symbol=symbol,
-        period=request.period,
-        strategy=spec.id,
-        params=params,
-        costs=asdict(request.costs),
-        dataset_sha256=dataset.sha256,
-        window=(window.first, window.last),
-        benchmark_symbol=bench_symbol,
-        summary=run_summary(s_perf, excess),
+    run_id = (
+        0
+        if not record
+        else repo.record_run(
+            conn,
+            created_at=now,
+            symbol=symbol,
+            period=request.period,
+            strategy=spec.id,
+            params=params,
+            costs=asdict(request.costs),
+            dataset_sha256=dataset.sha256,
+            window=(window.first, window.last),
+            benchmark_symbol=bench_symbol,
+            summary=run_summary(s_perf, excess),
+        )
     )
     counts = repo.run_counts(conn, symbol, spec.id)
 
@@ -423,7 +439,8 @@ def run(
             "biases the comparison.",
         )
 
-    repo.record_warnings(conn, run_id, warnings)
+    if record:
+        repo.record_warnings(conn, run_id, warnings)
     return BacktestReport(
         run_id=run_id,
         symbol=symbol,

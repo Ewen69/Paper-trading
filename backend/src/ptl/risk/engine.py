@@ -6,6 +6,7 @@ Checks, each reported with its arithmetic:
 - max loss per trade: the order's worst case <= limit
 - max daily loss: today's P&L must be above -limit; a breach also trips the kill switch
 - max open positions: positions after the order <= limit
+- max position size: the symbol's position value after the order <= pct x equity
 - max capital at risk: worst-case loss of open positions + this order <= pct x equity
 
 Worst case for a long stock position with no stop is its full notional. That's deliberately
@@ -21,6 +22,7 @@ class RiskLimits:
     max_daily_loss: float
     max_open_positions: int
     max_capital_at_risk_pct: float
+    max_position_pct: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +33,7 @@ class ProposedOrder:
     max_loss: float  # worst case in dollars for the new risk, including commissions
     defined_risk: bool
     new_position: bool  # True when it opens a position that doesn't exist yet
+    position_value_after: float = 0.0  # the symbol's position value if the order fills
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +119,16 @@ def evaluate(
                 "max_open_positions",
                 after <= limits.max_open_positions,
                 f"{after} open position(s) after this order vs limit {limits.max_open_positions}",
+            )
+        )
+        size_cap = limits.max_position_pct * account.equity
+        checks.append(
+            RiskCheck(
+                "max_position_size",
+                order.position_value_after <= size_cap,
+                f"{order.symbol} position {_money(order.position_value_after)} after this order vs "
+                f"{limits.max_position_pct:.0%} of equity {_money(account.equity)} = "
+                f"{_money(size_cap)}",
             )
         )
         cap = limits.max_capital_at_risk_pct * account.equity

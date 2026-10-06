@@ -28,6 +28,7 @@ from ptl.networth_api import build_networth_router
 from ptl.paper.factory import broker_factory
 from ptl.portfolio_api import build_portfolio_router
 from ptl.safety import assert_paper_endpoint
+from ptl.telemetry import TelemetryHub, build_telemetry_router
 
 logger = logging.getLogger(__name__)
 
@@ -73,17 +74,23 @@ def create_app(
         broker_factory=make_broker,
     )
 
+    hub = TelemetryHub(settings, source=source, calendar=calendar, clock=clock)
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await runtime.start()
+        await hub.start()
         try:
             yield
         finally:
+            await hub.stop()
             await runtime.stop()
 
     app = FastAPI(title="Paper Trading Lab", version=__version__, lifespan=lifespan)
     app.state.runtime = runtime
+    app.state.telemetry = hub
     app.include_router(build_ws_router(runtime))
+    app.include_router(build_telemetry_router(hub))
     app.include_router(build_live_router(settings, runtime, clock))
     app.include_router(build_health_router(settings, paper_base_url))
     app.include_router(build_data_router(settings, source, calendar, clock))

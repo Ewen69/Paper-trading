@@ -154,9 +154,9 @@ export const startPaperCycle = (body: {
 export const fetchPaperLog = (signal?: AbortSignal) =>
   getJson('/paper/log', paperLogSchema, signal);
 
-/** ws:// URL for the live activity stream, through the Vite proxy. */
-export const activityUrl = () =>
-  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/ws/activity`;
+/** ws:// URL for the live telemetry stream, through the Vite proxy. */
+export const telemetryUrl = () =>
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/ws/telemetry`;
 
 // ---- Net worth ----
 

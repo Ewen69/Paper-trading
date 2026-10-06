@@ -8,7 +8,8 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
 
 - Work one phase at a time. At the end of each phase: run `npm run check`, summarize what works
   and what fails, update the README, commit, then **stop entirely**. Do not start the next
-  phase without explicit written approval from the user. Never chain phases.
+  phase without explicit written approval from the user. Never chain phases (unless the user
+  explicitly asks for an end-to-end run, as they did for the unification).
 
 ## Non-negotiable rules
 
@@ -50,12 +51,18 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   - XP rewards process, never returns, wins or profit. No streaks or leaderboards.
   - Agents for unbuilt modules stay locked. A new module's agent unlocks in the phase that
     builds it.
-- Live agents (`ptl/agents`, frontend `src/city`):
+- Live agents (`ptl/agents`):
   - Sweeps run in-sample only, and every combination is a counted run.
   - Only an explicit `promote` may spend the single out-of-sample test on the finalist.
-  - Autopilot never promotes.
-  - Live status goes over `/ws/activity`. The City's 3D view is decoration; DOM panels carry
-    all data.
+  - Autopilot never promotes (and is off by default).
+- Optimizer, runner and telemetry (`ptl/agents/optimizer.py`, `ptl/runner`, `ptl/telemetry.py`,
+  frontend `src/ops`; see `docs/OPTIMIZER.md`):
+  - The optimizer searches in-sample only, within a per-target trial budget, and logs every
+    trial.
+  - The top 5% get one out-of-sample look each, never repeated.
+  - The Active Best is chosen in-sample only; out-of-sample results only label it as validated.
+  - The runner trades only a validated Active Best, dry run by default.
+  - The daemons are separate processes that talk through SQLite. The telemetry hub tails it.
 - Risk and paper (`ptl/risk`, `ptl/paper`):
   - Risk limits are code (`risk/engine.py`). Every order passes `evaluate` and is logged.
   - Dry run is the default.
@@ -76,7 +83,8 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
 ## Commands (run from repo root)
 
 - `npm install` — first-time setup (installs root tools, runs `uv sync` and frontend install).
-- `npm run dev` — start backend (:8000) and frontend (:5173) together.
+- `npm run start:all` — verify, migrate, and start API, optimizer, paper runner (dry run) and UI.
+- `npm run dev` — start backend (:8000) and frontend (:5173) together, with auto-reload.
 - `npm run ptl -- <command>` — CLI (`import-csv`, `datasets`, `delete-dataset`, `paper-cycle`,
   `kill-switch`, `networth-import`, `networth-export`); see `docs/DATA.md`, `docs/AGENTS.md`
   and `docs/NETWORTH.md`.

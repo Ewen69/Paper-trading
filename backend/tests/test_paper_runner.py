@@ -96,7 +96,11 @@ class Quotes(FakeSource):
 
 def generous(settings: Settings, per_trade: float = 20_000.0) -> Settings:
     return settings.model_copy(
-        update={"risk_max_loss_per_trade": per_trade, "risk_max_capital_at_risk_pct": 1.0}
+        update={
+            "risk_max_loss_per_trade": per_trade,
+            "risk_max_capital_at_risk_pct": 1.0,
+            "risk_max_position_pct": 1.0,
+        }
     )
 
 
@@ -140,29 +144,31 @@ def cycle(  # noqa: PLR0913, PLR0917 - test helper with defaults
     )
 
 
-def test_buy_is_sized_risk_checked_submitted_and_logged(
+def test_buy_is_sized_to_the_tightest_limit_risk_checked_and_logged(
     conn: sqlite3.Connection, settings: Settings
 ) -> None:
     broker = FakeBroker()
-    # Target 100% of $10,000 at live ask 600.00 -> floor(16.67) = 16 shares; worst case 9,600.
+    # Equity $10,000, ask 600.00. Caps: target 100% = 10,000; max position 25% = 2,500;
+    # per-trade 5,000; capital-at-risk headroom 50% = 5,000. Tightest: 2,500 -> 4 shares.
     result = cycle(conn, settings, broker, Quotes(ask=600.0))
     assert result.decision is not None
-    assert not result.decision.approved  # 9,600 > per-trade limit 5,000
-    assert "worst case $9,600.00 vs limit $5,000.00" in result.outcome
-    assert broker.submitted == []
-    # Raise the limits so the same order passes: 9,600 <= 20,000 and <= 100% of equity.
-    approved = cycle(conn, generous(settings), broker, Quotes(ask=600.0))
-    assert approved.decision is not None
-    assert approved.decision.approved
-    assert broker.submitted == [OrderTicket("SPY", "buy", 16.0)]
+    assert result.decision.approved
+    assert broker.submitted == [OrderTicket("SPY", "buy", 4.0)]
+    position = next(c for c in result.decision.checks if c.name == "max_position_size")
+    assert position.detail == (
+        "SPY position $2,400.00 after this order vs 25% of equity $10,000.00 = $2,500.00"
+    )
     [order] = store.recent_orders(conn, 1)
-    assert (order.side, order.qty, order.status) == ("buy", 16.0, "accepted")
+    assert (order.side, order.qty, order.status) == ("buy", 4.0, "accepted")
     assert order.broker_order_id == "b-1"
     assert "Buy and hold: always 100% invested." in order.reason
-    assert "Target 100% of equity $10,000.00 (test broker) at 600.00 = 16 shares" in order.reason
-    [latest, rejected] = store.recent_cycles(conn, 2)
+    assert "sized by max position size ($2,500.00) = 4 shares" in order.reason
+    # With the limits raised, the strategy's own target binds: floor(10,000 / 600) = 16.
+    raised = FakeBroker()
+    cycle(conn, generous(settings), raised, Quotes(ask=600.0))
+    assert raised.submitted == [OrderTicket("SPY", "buy", 16.0)]
+    [latest, _] = store.recent_cycles(conn, 2)
     assert latest.price_source.startswith("live ask 600.00")
-    assert "blocked by the risk engine" in rejected.outcome
     assert len(risk_store.recent_decisions(conn)) == 2
 
 
@@ -201,7 +207,7 @@ def test_options_and_unknown_strategies_are_refused(
 
 def test_no_order_when_already_at_target(conn: sqlite3.Connection, settings: Settings) -> None:
     broker = FakeBroker(positions={"SPY": BrokerPosition("SPY", 16, 9_600)})
-    result = cycle(conn, settings, broker, Quotes(600.0))
+    result = cycle(conn, generous(settings), broker, Quotes(600.0))
     assert result.outcome == "No order: already holding the target 16 shares."
     assert broker.submitted == []
 
@@ -245,6 +251,11 @@ def test_sync_records_fills_and_logs_are_append_only(
     assert store.latest_status(conn, order.id) == "filled"
     evidence = store.paper_evidence(conn)
     assert (evidence.filled_trades, evidence.decisions, evidence.kill_switch_trips) == (1, 1, 0)
+    # Sized at the live ask 600.00, filled at 600.10: a buy paid 0.10/share more = 1.67 bps.
+    ex = store.execution(conn, order)
+    assert (ex.quote_price, ex.fill_price) == (600.0, 600.1)
+    assert ex.slippage_per_share == pytest.approx(0.1)
+    assert ex.slippage_bps == pytest.approx(0.1 / 600 * 10_000)
     for table in ("paper_cycles", "paper_orders", "paper_order_events", "risk_decisions"):
         with pytest.raises(sqlite3.DatabaseError, match="append-only"):
             conn.execute(f"DELETE FROM {table}")  # noqa: S608 - fixed table names

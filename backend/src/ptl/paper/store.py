@@ -315,3 +315,30 @@ def paper_evidence(conn: sqlite3.Connection) -> PaperEvidence:
         kill_switch_trips=int(risk["trips"]),
         decisions=int(risk["n"]),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class Execution:
+    """Quote the order was sized at, its fill, and the slippage between them (+ = worse)."""
+
+    quote_price: float | None
+    fill_price: float | None
+    slippage_per_share: float | None
+    slippage_bps: float | None
+
+
+def execution(conn: sqlite3.Connection, order: OrderRecord) -> Execution:
+    quote_row = conn.execute(
+        "SELECT price FROM paper_cycles WHERE id = ?", (order.cycle_id,)
+    ).fetchone()
+    fill_row = conn.execute(
+        "SELECT fill_price FROM paper_order_events WHERE order_id = ? AND fill_price IS NOT NULL "
+        "ORDER BY id DESC LIMIT 1",
+        (order.id,),
+    ).fetchone()
+    quote = None if quote_row is None or quote_row["price"] is None else float(quote_row["price"])
+    fill = None if fill_row is None else float(fill_row["fill_price"])
+    if quote is None or fill is None or quote <= 0:
+        return Execution(quote, fill, None, None)
+    slip = fill - quote if order.side == "buy" else quote - fill
+    return Execution(quote, fill, slip, slip / quote * 10_000)

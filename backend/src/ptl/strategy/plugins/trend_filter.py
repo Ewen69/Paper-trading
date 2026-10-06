@@ -18,6 +18,7 @@ class TrendFilter(EquityStrategy):
         ParamSpec("lookback", "Average length", 200, 2, 400, "Sessions in the moving average."),
     )
     sweep_grid: ClassVar[dict[str, list[int]]] = {"lookback": [50, 100, 150, 200]}
+    search_space: ClassVar[dict[str, tuple[int, int]]] = {"lookback": (20, 300)}
 
     def __init__(self, lookback: int) -> None:
         self.lookback = lookback

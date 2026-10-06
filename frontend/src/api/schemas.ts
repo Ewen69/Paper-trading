@@ -742,3 +742,192 @@ export const holdingSchema = z.object({
 });
 
 export const holdingsImportSchema = z.object({ imported: z.number().int(), removed: z.number().int() });
+
+// ---- Telemetry (Operations Center, /ws/telemetry) ----
+
+const isoDateTimeLoose = z.string(); // displayed as-is in the terminal feed
+
+export const trialSchema = z.object({
+  id: z.number().int(),
+  created_at: isoDateTimeLoose,
+  search_id: z.string(),
+  generation: z.number().int(),
+  asset: z.string(),
+  strategy: z.string(),
+  symbol: z.string(),
+  params: z.record(z.string(), z.number()),
+  period: z.string(),
+  run_id: z.number().int().nullable(),
+  reused: z.boolean(),
+  trades: z.number().int().nullable(),
+  win_rate: z.number().nullable(),
+  sharpe: z.number().nullable(),
+  max_drawdown: z.number().nullable(),
+  fitness: z.number().nullable(),
+  verdict: z.string(),
+});
+export type TelemetryTrial = z.infer<typeof trialSchema>;
+
+export const logLineSchema = z.object({
+  id: z.number().int(),
+  created_at: isoDateTimeLoose,
+  daemon: z.string(),
+  level: z.enum(['info', 'warn', 'error']),
+  message: z.string(),
+});
+export type LogLine = z.infer<typeof logLineSchema>;
+
+export const daemonSchema = z.object({
+  daemon: z.string(),
+  status: z.string(),
+  alive: z.boolean(),
+  pid: z.number().int().optional(),
+  started_at: isoDateTimeLoose.optional(),
+  beat_at: isoDateTimeLoose.nullable(),
+  age_seconds: z.number().optional(),
+  // Heartbeat detail; fields depend on the daemon. Unknown extras are kept, not trusted.
+  detail: z.looseObject({
+    state: z.string().optional(),
+    target: z.string().optional(),
+    generation: z.number().optional(),
+    fresh_trials: z.number().optional(),
+    budget: z.number().optional(),
+    mode: z.string().optional(),
+    last_outcome: z.string().optional(),
+    account: z
+      .looseObject({
+        error: z.string().optional(),
+        source: z.string().optional(),
+        equity: z.number().optional(),
+        cash: z.number().optional(),
+        day_pnl: z.number().optional(),
+        positions: z
+          .array(z.object({ symbol: z.string(), qty: z.number(), market_value: z.number() }))
+          .optional(),
+        risk: z
+          .array(z.object({ name: z.string(), used: z.number(), limit: z.number(), utilization: z.number() }))
+          .optional(),
+      })
+      .optional(),
+  }),
+});
+export type Daemon = z.infer<typeof daemonSchema>;
+
+const sectionError = z.object({ error: z.string() });
+const section = <T extends z.ZodType>(ok: T) => z.union([ok, sectionError]);
+
+const curvePoint = z.object({ day: isoDate, strategy: z.number().nullable(), benchmark: z.number().nullable() });
+
+export const activeBestSchema = z.object({
+  id: z.number().int(),
+  created_at: isoDateTimeLoose,
+  asset: z.string(),
+  strategy: z.string(),
+  symbol: z.string(),
+  dataset_id: z.number().int(),
+  params: z.record(z.string(), z.number()),
+  in_sample_fitness: z.number(),
+  validated: z.boolean(),
+  reason: z.string(),
+  in_sample: trialSchema.nullable(),
+  out_of_sample: trialSchema.nullable(),
+  curve: z.record(z.string(), z.array(curvePoint)),
+});
+export type ActiveBestT = z.infer<typeof activeBestSchema>;
+
+export const telemetryStateSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  daemons: z.array(daemonSchema),
+  optimizer: section(
+    z.object({
+      counts: z.object({
+        total: z.number().int(),
+        in_sample: z.number().int(),
+        out_of_sample: z.number().int(),
+        reused: z.number().int(),
+        searches: z.number().int(),
+      }),
+      active_best: z.object({ equity: activeBestSchema.nullable(), options: activeBestSchema.nullable() }),
+      history: z.array(
+        z.object({
+          id: z.number().int(),
+          created_at: isoDateTimeLoose,
+          strategy: z.string(),
+          symbol: z.string(),
+          params: z.record(z.string(), z.number()),
+          in_sample_fitness: z.number(),
+          validated: z.boolean(),
+        }),
+      ),
+    }),
+  ),
+  paper: section(
+    z.object({
+      orders: z.array(
+        z.object({
+          id: z.number().int(),
+          created_at: isoDateTimeLoose,
+          mode: z.string(),
+          symbol: z.string(),
+          side: z.string(),
+          qty: z.number(),
+          status: z.string(),
+          reason: z.string(),
+          quote_price: z.number().nullable(),
+          fill_price: z.number().nullable(),
+          slippage_per_share: z.number().nullable(),
+          slippage_bps: z.number().nullable(),
+        }),
+      ),
+      filled_paper_trades: z.number().int(),
+      kill_switch_trips: z.number().int(),
+    }),
+  ),
+  risk: section(
+    z.object({
+      kill_switch: z.object({ engaged: z.boolean(), reason: z.string() }),
+      limits: z.record(z.string(), z.number()),
+    }),
+  ),
+  auditor: section(
+    z.object({
+      data_health: z.string(),
+      flags: gameStateSchema.shape.flags,
+      graduation: gameStateSchema.shape.graduation,
+    }),
+  ),
+  portfolio: section(
+    z.object({
+      total_value: z.number(),
+      allocation: z.array(z.object({ asset_class: z.string(), value: z.number(), weight: z.number() })),
+      positions: z.number().int(),
+      unpriced: z.number().int(),
+      rules_fired: z.number().int(),
+    }),
+  ),
+  net_worth: section(
+    z.object({
+      totals: netWorthSchema.shape.totals,
+      history: netWorthSchema.shape.history,
+      source: z.string(),
+      as_of: isoDateTime,
+    }),
+  ),
+});
+export type TelemetryState = z.infer<typeof telemetryStateSchema>;
+
+export const telemetryEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('hello'),
+    state: telemetryStateSchema,
+    log: z.array(logLineSchema),
+    trials: z.array(trialSchema),
+  }),
+  z.object({ type: z.literal('trial'), trial: trialSchema }),
+  z.object({ type: z.literal('log'), line: logLineSchema }),
+  z.object({ type: z.literal('daemons'), daemons: z.array(daemonSchema) }),
+  z.object({ type: z.literal('state'), state: telemetryStateSchema }),
+  z.object({ type: z.literal('error'), message: z.string() }),
+]);
+export type TelemetryEvent = z.infer<typeof telemetryEventSchema>;

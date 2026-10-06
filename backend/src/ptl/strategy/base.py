@@ -61,6 +61,8 @@ class Strategy(ABC):
     params: ClassVar[tuple[ParamSpec, ...]] = ()
     # Values the research agents sweep in-sample. Defaults to each parameter's default.
     sweep_grid: ClassVar[Mapping[str, Sequence[int]]] = {}
+    # Inclusive ranges the learning optimizer may explore; params not listed stay at default.
+    search_space: ClassVar[Mapping[str, tuple[int, int]]] = {}
 
     @property
     def warmup(self) -> int:
@@ -72,6 +74,16 @@ class Strategy(ABC):
         """Validate params (filling defaults) and build an instance. Raises ValueError."""
         resolved = resolve_params(cls.id, cls.params, params)
         return cls(**resolved), resolved
+
+    @classmethod
+    def space(cls) -> dict[str, tuple[int, int]]:
+        """Search ranges for the optimizer, clipped to each parameter's allowed bounds."""
+        out = {}
+        for p in cls.params:
+            if p.name in cls.search_space:
+                lo, hi = cls.search_space[p.name]
+                out[p.name] = (max(lo, p.minimum), min(hi, p.maximum))
+        return out
 
     @classmethod
     def grid(cls) -> dict[str, list[int]]:

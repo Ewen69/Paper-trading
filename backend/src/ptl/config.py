@@ -47,9 +47,11 @@ class Settings(BaseSettings):
     risk_max_daily_loss: float = Field(default=2_000.0, gt=0)
     risk_max_open_positions: int = Field(default=5, ge=1)
     risk_max_capital_at_risk_pct: float = Field(default=0.5, gt=0, le=1)
+    risk_max_position_pct: float = Field(default=0.25, gt=0, le=1)
 
     # Agents: background research workers (in-sample sweeps only) and the paper runner.
-    agents_autopilot: bool = True
+    # Off by default: the learning optimizer daemon now does the searching (docs/OPTIMIZER.md).
+    agents_autopilot: bool = False
     agents_poll_seconds: float = Field(default=30.0, gt=0)
     agents_max_combinations: int = Field(default=50, ge=1)
     paper_dry_run_capital: float = Field(default=100_000.0, gt=0)
@@ -58,6 +60,14 @@ class Settings(BaseSettings):
     # Portfolio: default benchmark and risk window (sessions) for volatility, drawdown and beta.
     portfolio_benchmark: str = "SPY"
     portfolio_window_sessions: int = Field(default=252, ge=20, le=2520)
+    # Learning optimizer (genetic search, in-sample only; see docs/OPTIMIZER.md).
+    optimizer_population: int = Field(default=12, ge=4, le=200)
+    optimizer_generations: int = Field(default=6, ge=1, le=100)
+    optimizer_max_trials_per_target: int = Field(default=120, ge=10, le=5000)
+    optimizer_min_trades: int = Field(default=10, ge=1)
+    optimizer_idle_seconds: float = Field(default=60.0, gt=0)
+    # Paper runner daemon: how often it wakes up to check for a new session.
+    runner_poll_seconds: float = Field(default=60.0, gt=0)
 
     @field_validator("database_path")
     @classmethod

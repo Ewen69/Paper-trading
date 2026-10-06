@@ -6,9 +6,64 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 5 (portfolio analysis and rule checks)
+## Status: unified system (all phases built)
 
-Next: Phase 6 (UI/UX pass). See [`docs/PLAN.md`](docs/PLAN.md).
+Start everything with one command:
+
+```bash
+npm run start:all
+```
+
+It checks Python, packages and Node, verifies the paper endpoint, migrates the database, then
+runs four processes and opens the **Operations Center** at http://localhost:5173:
+
+- the API
+- the learning optimizer daemon
+- the paper runner daemon (**dry run**)
+- the web UI
+
+Options: `-- --paper` (the runner sends to the Alpaca PAPER account), `--no-optimizer`,
+`--no-runner`, `--no-web`, and `--check` (verify and migrate, then exit). Ctrl+C stops
+everything.
+
+### Architecture
+
+| Piece | What it does | Docs |
+|---|---|---|
+| Operations Center (station 1) | Live telemetry dashboard: agent terminal, learning agent, Active Best equity curve, paper runner with risk utilization and slippage, net worth, allocation, Auditor, manual controls | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| Learning optimizer daemon | Genetic search over strategy parameters on in-sample data. Every trial is logged and counted, with a per-target budget. The top 5% get one counted out-of-sample look each. The Active Best is picked in-sample only and labeled by its holdout result | [`docs/OPTIMIZER.md`](docs/OPTIMIZER.md) |
+| Paper runner daemon | Trades only a *validated* Active Best, once per session. Sized to the tightest risk limit and checked by the hard-coded risk engine. Logs quote, fill and slippage. Dry run by default, PAPER endpoint only | [`docs/OPTIMIZER.md`](docs/OPTIMIZER.md) |
+| Backtesting, options engine | Honest fills, out-of-sample lock, trial counts, bootstrap CIs | [`docs/BACKTESTING.md`](docs/BACKTESTING.md), [`docs/OPTIONS.md`](docs/OPTIONS.md) |
+| Net worth, portfolio | Manual entries and CSV only, local SQLite | [`docs/NETWORTH.md`](docs/NETWORTH.md), [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md) |
+| HQ, stations, Auditor, Graduation Gate | Game-style views of the same stored records | [`docs/GAME.md`](docs/GAME.md) |
+
+### What the unification added
+
+- **Phase 4 and Phase 5 are merged into `main`.**
+- **The 3D City view and three.js are removed.** They're replaced by the dense dark Operations
+  Center. The whole frontend is now one ~450 kB bundle (128 kB gzipped), with no 933 kB 3D
+  chunk.
+- **Optimizer daemon** (`ptl/agents/optimizer.py`) with the append-only `agent_learning_log`
+  and Active Best history.
+- **Paper runner daemon** (`ptl/runner/`), with a new **max position size** risk limit, sizing
+  to the tightest limit, and slippage logging.
+- **Telemetry hub** with `/ws/telemetry`, plus the orchestrator (`npm run start:all`).
+- **The old agent autopilot is now off by default** (`AGENTS_AUTOPILOT=false`); the optimizer
+  does the searching.
+
+### Limitations of the unified system
+
+- **No new data arrives on its own.** The optimizer idles when every target's trial budget is
+  spent; import new data to continue. The runner refuses stale bars; there's no automatic bar
+  download.
+- **Paper trading is equity-only.** Options Active Bests have no curve and aren't paper traded.
+- **Fitness is plain in-sample Sharpe.** Over-search is controlled by trial counts, budgets and
+  the out-of-sample label, not by a deflated Sharpe.
+- **No supervision.** `start:all` stops everything if any process exits; it doesn't restart
+  crashed daemons.
+- **Dense layout needs a wide screen.** On narrow screens the panels stack.
+
+### What Phase 5 added
 
 ### What Phase 5 adds
 
@@ -80,8 +135,8 @@ Details: [`docs/NETWORTH.md`](docs/NETWORTH.md).
 
 Details: [`docs/AGENTS.md`](docs/AGENTS.md).
 
-- **The City, now the default screen (`#city`).** It's an isometric 3D view (three.js via
-  react-three-fiber) with four sectors: Data Ingestion, Strategy Research, Options Risk and the
+- **The City (since replaced by the Operations Center).** It was an isometric 3D view
+  (three.js via react-three-fiber) with four sectors: Data Ingestion, Strategy Research, Options Risk and the
   Execution Hub.
   - Agents are geometric nodes. A running node pulses, streams particles, and floats a label
     with the exact parameters it's testing.
@@ -122,7 +177,7 @@ Details: [`docs/AGENTS.md`](docs/AGENTS.md).
 - **Orders are whole-share market DAY orders.** Limit orders and partial-fill logic aren't
   built.
 - **Current bars must be imported by hand.** There is no automatic bar download.
-- **The 3D view is a lazily loaded ~250 kB (gzipped) chunk.** Vite warns about its size.
+- **The 3D view was a lazily loaded ~250 kB (gzipped) chunk.** It was later removed.
 
 ### What Phase 2b added
 
@@ -339,10 +394,12 @@ npm install
 That installs the root tools, then runs `uv sync` for the backend and `npm install` for the frontend.
 
 ```bash
-npm run dev
+npm run start:all
 ```
 
-The API runs at http://127.0.0.1:8000 and the UI at http://localhost:5173.
+That starts the API (http://127.0.0.1:8000), both daemons, and the UI (http://localhost:5173).
+`npm run dev` still starts just the API and UI with auto-reload; `npm run optimizer` and
+`npm run runner -- --dry-run` start each daemon on its own.
 
 Optional: copy `.env.example` to `.env` and add your **paper** keys. The app runs without them,
 but live quotes will show "No data".
