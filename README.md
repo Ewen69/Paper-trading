@@ -6,7 +6,7 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: unified system (all phases built)
+## Status: unified system + Phase 7 (live ops, options execution)
 
 Start everything with one command:
 
@@ -37,6 +37,55 @@ everything.
 | Net worth, portfolio | Manual entries and CSV only, local SQLite | [`docs/NETWORTH.md`](docs/NETWORTH.md), [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md) |
 | HQ, stations, Auditor, Graduation Gate | Game-style views of the same stored records | [`docs/GAME.md`](docs/GAME.md) |
 
+### Phase 7: live ops and options execution
+
+Details: [`docs/LIVE_OPS.md`](docs/LIVE_OPS.md).
+
+- **Quieter UI.**
+  - Optimizer trials and routine log lines only scroll through the agent terminal.
+  - Toasts appear only for major events: new Active Best, re-validation, budget exhausted,
+    optimizer idle, a risk limit blocking an order, a kill-switch trip, data sync, and paper
+    orders.
+  - Repeats of the same kind within 15 seconds merge into one toast with a counter. At most
+    3 are shown, and a burst of research events collapses into one summary.
+- **Daily equity data sync** (with paper API keys). The runner daemon fetches daily bars from
+  Alpaca market data on startup if data is stale, and after each close (+20 min).
+  - Each symbol gets its own sync dataset: raw OHLC plus adjusted close. The adjusted history
+    is refreshed after a split or dividend, and quality checks run every time.
+  - It covers every symbol the app uses: imported data, holdings, Active Bests and the
+    benchmark.
+- **After a sync: re-check, no budget reset.** New bars land in the locked out-of-sample
+  window, so in-sample results can't change.
+  - Instead of re-searching, the Active Best gets one more counted out-of-sample run on the
+    fresh data and is re-labeled validated or not.
+  - The optimizer picks up genuinely new targets on its own.
+- **Options paper execution.** The runner trades a validated options Active Best (the put
+  credit spread) on live option quotes, while the market is open.
+  - It opens at most one round of spreads per day.
+  - Both legs go as **one multi-leg order** to the Alpaca paper API: a credit limit to open, a
+    debit limit to close.
+  - Credit = short bid - long ask. Collateral = width x 100 x contracts - credit x 100 x
+    contracts.
+  - Contracts are sized to the tightest risk limit, then checked by the risk engine.
+  - Spreads close on the strategy's take-profit rule, or 1 day before expiration to avoid
+    assignment and pin risk.
+  - Dry run logs the same orders and sends nothing.
+
+#### Phase 7 limitations
+
+- **Not tested against the real Alpaca API.** The sync and options execution are covered by
+  tests with fake Alpaca clients. The multi-leg sign convention (negative limit = credit)
+  follows alpaca-py's documentation. Try it with your paper keys before relying on it.
+- **Free-plan data is limited.**
+  - Daily bars on the IEX feed reflect one venue's prices and volume, not the consolidated tape.
+  - Option quotes on the indicative feed are delayed.
+- **Options paper trading covers the put credit spread only.**
+  - Partial fills of a multi-leg order are tracked only as order status.
+  - An opening order that's canceled or rejected marks the spread "void".
+- **Data comes from more than one source.** Signals use the freshest dataset for a symbol (the
+  sync dataset once it exists). The run log matches runs by symbol and parameters, not by data
+  source.
+
 ### What the unification added
 
 - **Phase 4 and Phase 5 are merged into `main`.**
@@ -56,7 +105,8 @@ everything.
 - **No new data arrives on its own.** The optimizer idles when every target's trial budget is
   spent; import new data to continue. The runner refuses stale bars; there's no automatic bar
   download.
-- **Paper trading is equity-only.** Options Active Bests have no curve and aren't paper traded.
+- **Options Active Bests have no equity curve.** (Since Phase 7 they are paper traded as
+  multi-leg spreads.)
 - **Fitness is plain in-sample Sharpe.** Over-search is controlled by trial counts, budgets and
   the out-of-sample label, not by a deflated Sharpe.
 - **No supervision.** `start:all` stops everything if any process exits; it doesn't restart

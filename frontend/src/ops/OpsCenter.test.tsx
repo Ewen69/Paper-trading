@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { stubFetch } from '../test/fakeFetch';
 import { stubSocket, type FakeSocket } from '../test/fakeSocket';
 import { helloPayload, statePayload, trialPayload } from '../test/telemetryFixtures';
-import { OpsCenter } from './OpsCenter';
+import { OpsCenterLive as OpsCenter } from './OpsCenter';
 
 let sockets: FakeSocket[];
 

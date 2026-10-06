@@ -3,7 +3,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { healthPayload, strategiesPayload, stubFetch, universePayload } from '../test/fakeFetch';
+import { stubSocket } from '../test/fakeSocket';
 import { gameStatePayload, repeatLookEvent } from '../test/gameFixtures';
+import { helloPayload, trialPayload } from '../test/telemetryFixtures';
 import { announceActivity } from './activity';
 import { GameShell } from './GameShell';
 
@@ -58,5 +60,36 @@ describe('GameShell', () => {
     const toast = await screen.findByRole('status');
     expect(toast).toHaveTextContent('+0 XP');
     expect(toast).toHaveTextContent('repeat look at the holdout: no XP');
+  });
+
+  it('keeps optimizer trials silent and merges repeated major events into one toast', async () => {
+    stubFetch(routes);
+    const sockets = stubSocket();
+    render(<GameShell />);
+    await screen.findByText('LV 2');
+    const socket = sockets.at(-1);
+    if (!socket) throw new Error('no telemetry socket');
+    act(() => {
+      socket.push(helloPayload);
+    });
+    act(() => {
+      for (let i = 10; i < 40; i++) socket.push({ type: 'trial', trial: trialPayload({ id: i }) });
+    });
+    expect(screen.queryByRole('status')).toBeNull();
+    const line = (id: number, kind: string, message: string) => ({
+      type: 'log',
+      line: { id, created_at: '2026-10-06T15:00:00+00:00', daemon: 'paper-runner', level: 'info', message, kind },
+    });
+    act(() => {
+      socket.push(line(50, 'info', 'Session handled.'));
+      socket.push(line(51, 'risk', 'Order blocked: max position size.'));
+      socket.push(line(52, 'risk', 'Order blocked: max loss per trade.'));
+      socket.push(line(53, 'risk', 'Order blocked: capital at risk.'));
+    });
+    const toast = await screen.findByRole('status');
+    expect(toast).toHaveTextContent('Risk limit blocked an order');
+    expect(toast).toHaveTextContent('x3');
+    expect(toast).toHaveTextContent('Order blocked: capital at risk.');
+    expect(toast).not.toHaveTextContent('Session handled.');
   });
 });

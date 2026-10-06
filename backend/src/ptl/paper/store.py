@@ -342,3 +342,162 @@ def execution(conn: sqlite3.Connection, order: OrderRecord) -> Execution:
         return Execution(quote, fill, None, None)
     slip = fill - quote if order.side == "buy" else quote - fill
     return Execution(quote, fill, slip, slip / quote * 10_000)
+
+
+@dataclass(frozen=True, slots=True)
+class SpreadRecord:
+    id: int
+    created_at: datetime
+    runner_id: int | None
+    cycle_id: int
+    mode: Mode
+    underlying: str
+    expiration: date
+    option_type: str
+    short_symbol: str
+    long_symbol: str
+    short_strike: float
+    long_strike: float
+    contracts: int
+    credit: float  # per share, as quoted at submission
+    collateral: float  # total dollars: width x 100 x contracts - credit x 100 x contracts
+    open_order_id: int
+    close_order_id: int | None
+    status: str
+    closed_at: datetime | None
+    close_debit: float | None
+    note: str
+
+    @property
+    def label(self) -> str:
+        kind = "P" if self.option_type == "put" else "C"
+        return (
+            f"{self.underlying} {self.expiration} {self.short_strike:g}/{self.long_strike:g}{kind}"
+        )
+
+
+def _spread(r: sqlite3.Row) -> SpreadRecord:
+    return SpreadRecord(
+        id=r["id"],
+        created_at=datetime.fromisoformat(r["created_at"]),
+        runner_id=r["runner_id"],
+        cycle_id=r["cycle_id"],
+        mode=r["mode"],
+        underlying=r["underlying"],
+        expiration=date.fromisoformat(r["expiration"]),
+        option_type=r["option_type"],
+        short_symbol=r["short_symbol"],
+        long_symbol=r["long_symbol"],
+        short_strike=r["short_strike"],
+        long_strike=r["long_strike"],
+        contracts=r["contracts"],
+        credit=r["credit"],
+        collateral=r["collateral"],
+        open_order_id=r["open_order_id"],
+        close_order_id=r["close_order_id"],
+        status=r["status"],
+        closed_at=datetime.fromisoformat(r["closed_at"]) if r["closed_at"] else None,
+        close_debit=r["close_debit"],
+        note=r["note"],
+    )
+
+
+def create_spread(  # noqa: PLR0913
+    conn: sqlite3.Connection,
+    *,
+    now: datetime,
+    runner_id: int | None,
+    cycle_id: int,
+    mode: Mode,
+    underlying: str,
+    expiration: date,
+    option_type: str,
+    short_symbol: str,
+    long_symbol: str,
+    short_strike: float,
+    long_strike: float,
+    contracts: int,
+    credit: float,
+    collateral: float,
+    open_order_id: int,
+    note: str,
+) -> int:
+    with conn:
+        return _id(
+            conn.execute(
+                """
+                INSERT INTO paper_spreads (created_at, runner_id, cycle_id, mode, underlying,
+                    expiration, option_type, short_symbol, long_symbol, short_strike,
+                    long_strike, contracts, credit, collateral, open_order_id, status, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+                """,
+                (
+                    now.isoformat(),
+                    runner_id,
+                    cycle_id,
+                    mode,
+                    underlying,
+                    expiration.isoformat(),
+                    option_type,
+                    short_symbol,
+                    long_symbol,
+                    short_strike,
+                    long_strike,
+                    contracts,
+                    credit,
+                    collateral,
+                    open_order_id,
+                    note,
+                ),
+            )
+        )
+
+
+def spreads(
+    conn: sqlite3.Connection,
+    *,
+    statuses: tuple[str, ...] = ("open", "closing"),
+    runner_id: int | None = None,
+) -> list[SpreadRecord]:
+    marks = ", ".join("?" for _ in statuses)
+    sql = f"SELECT * FROM paper_spreads WHERE status IN ({marks})"  # noqa: S608 - placeholders only
+    args: list[object] = list(statuses)
+    if runner_id is not None:
+        sql += " AND runner_id = ?"
+        args.append(runner_id)
+    return [_spread(r) for r in conn.execute(sql + " ORDER BY id", args)]
+
+
+def update_spread(  # noqa: PLR0913
+    conn: sqlite3.Connection,
+    spread_id: int,
+    *,
+    status: str,
+    close_order_id: int | None = None,
+    closed_at: datetime | None = None,
+    close_debit: float | None = None,
+    note: str | None = None,
+) -> None:
+    with conn:
+        conn.execute(
+            "UPDATE paper_spreads SET status = ?, close_order_id = COALESCE(?, close_order_id), "
+            "closed_at = COALESCE(?, closed_at), close_debit = COALESCE(?, close_debit), "
+            "note = COALESCE(?, note) WHERE id = ?",
+            (
+                status,
+                close_order_id,
+                closed_at.isoformat() if closed_at else None,
+                close_debit,
+                note,
+                spread_id,
+            ),
+        )
+
+
+def last_fill(conn: sqlite3.Connection, order_id: int) -> float | None:
+    row = conn.execute(
+        "SELECT fill_price FROM paper_order_events WHERE order_id = ? AND fill_price IS NOT NULL "
+        "ORDER BY id DESC LIMIT 1",
+        (order_id,),
+    ).fetchone()
+    return None if row is None else float(row["fill_price"])

@@ -78,6 +78,12 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   - Unpriced holdings are listed, never guessed.
   - Paper positions are read-only and kept as a separate book.
   - Tips are rules that show the observed value and threshold, never advice.
+- Live ops (`ptl/data/daily_sync.py`, `ptl/paper/options_cycle.py`; see `docs/LIVE_OPS.md`):
+  - Data syncs never reset trial budgets. They trigger one counted out-of-sample re-check of
+    the Active Best.
+  - Option spreads go as one multi-leg order, priced at bid/ask, with collateral checked by
+    the risk engine.
+  - Toasts fire only for major `kind`s.
 - Commits use the GitHub no-reply email (the repo is public).
 
 ## Commands (run from repo root)

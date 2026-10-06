@@ -381,6 +381,26 @@ function Paper({ view }: { view: TelemetryView }) {
           </p>
         </>
       )}
+      {account && !account.error && (account.spreads ?? []).length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-[11px] text-slate-300" aria-label="Open option spreads">
+          {(account.spreads ?? []).map((s) => (
+            <li key={`${s.label}-${s.status}`}>
+              {s.mode === 'dry_run' ? 'dry ' : ''}
+              {s.contracts} x {s.label} · credit {s.credit.toFixed(2)} · collateral {usd(s.collateral)} · {s.status}
+            </li>
+          ))}
+        </ul>
+      )}
+      {run?.alive && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          Daily data sync:{' '}
+          {run.detail.sync?.off
+            ? `off (${run.detail.sync.off})`
+            : run.detail.sync?.at
+              ? `${run.detail.sync.current ? 'current' : 'catching up'} through ${run.detail.sync.target_session ?? '—'}, ${String(run.detail.sync.added_bars ?? 0)} bar(s) added at ${time(run.detail.sync.at)}${run.detail.sync.failures?.length ? `; failed: ${run.detail.sync.failures.join(', ')}` : ''}`
+              : 'waiting for the next session'}
+        </p>
+      )}
       {run?.detail.last_outcome && (
         <p className="mt-2 text-[11px] text-slate-300">Last cycle: {run.detail.last_outcome}</p>
       )}
@@ -495,8 +515,12 @@ function AuditorLive({ view }: { view: TelemetryView }) {
   );
 }
 
-export function OpsCenter({ url }: { url?: string }) {
-  const view = useTelemetry(url);
+/** Standalone: opens its own telemetry stream (tests, embedding). */
+export function OpsCenterLive({ url }: { url?: string }) {
+  return <OpsCenter view={useTelemetry(url)} />;
+}
+
+export function OpsCenter({ view }: { view: TelemetryView }) {
   const risk = ok(view.state, 'risk');
   return (
     <div className="space-y-3">
