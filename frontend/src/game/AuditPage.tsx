@@ -25,7 +25,7 @@ function FlagItem({ flag }: { flag: Flag }) {
           <span aria-hidden="true">{s.icon} </span>
           {flag.title}
         </span>
-        <span className="font-display font-bold tracking-wide text-[11px] uppercase text-slate-400">{s.label}</span>
+        <span className="font-pixel text-[8px] uppercase text-slate-400">{s.label}</span>
       </div>
       <p className="mt-1 text-sm text-slate-300">{flag.summary}</p>
       <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-slate-500">

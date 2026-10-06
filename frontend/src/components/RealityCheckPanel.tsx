@@ -1,6 +1,6 @@
 import type { ResultCore } from '../api/schemas';
 import { pct, range, usd } from '../format';
-import { AgentAvatar } from '../game/AgentAvatar';
+import { AgentSprite } from '../game/AgentSprite';
 import { Provenance } from './Provenance';
 
 interface Tile {
@@ -78,7 +78,7 @@ export function RealityCheckPanel({ report }: { report: ResultCore }) {
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h2
           id={`reality-${String(report.run_id)}`}
-          className="font-display font-bold tracking-wide text-[13px] uppercase leading-relaxed tracking-wider text-amber-300"
+          className="font-pixel text-[10px] uppercase leading-relaxed tracking-wider text-amber-300"
         >
           Reality check: read this first
         </h2>
@@ -100,7 +100,7 @@ export function RealityCheckPanel({ report }: { report: ResultCore }) {
               <dt className="flex items-center justify-between gap-1 text-[11px] text-slate-400">
                 {t.label}
                 {flagged && (
-                  <span className="font-display font-bold tracking-wide text-[10px] uppercase text-amber-300">⚠ flagged</span>
+                  <span className="font-pixel text-[7px] uppercase text-amber-300">⚠ flagged</span>
                 )}
               </dt>
               <dd className="font-mono text-lg text-slate-100">{t.value}</dd>
@@ -113,10 +113,10 @@ export function RealityCheckPanel({ report }: { report: ResultCore }) {
       {rc.warnings.length > 0 && (
         <div className="mt-4 flex gap-3">
           <div className="shrink-0">
-            <AgentAvatar agentId="auditor" size={40} />
+            <AgentSprite agentId="auditor" size={40} animate={false} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-display font-bold tracking-wide text-[11px] uppercase text-slate-300">Auditor says</p>
+            <p className="font-pixel text-[8px] uppercase text-slate-300">Auditor says</p>
             <ul className="mt-2 space-y-1.5" aria-label="Warnings">
               {rc.warnings.map((w) => (
                 <li

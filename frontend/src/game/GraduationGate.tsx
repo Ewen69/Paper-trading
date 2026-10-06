@@ -21,10 +21,10 @@ export function GraduationGate({ gate }: { gate: Graduation }) {
           return (
             <li key={item.id} className={`border-l-4 bg-slate-950/50 py-2 pl-3 pr-2 ${s.tone}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-display font-bold tracking-wide text-[12px] uppercase leading-relaxed text-slate-100">
+                <span className="font-pixel text-[9px] uppercase leading-relaxed text-slate-100">
                   {item.title}
                 </span>
-                <span className={`font-display font-bold tracking-wide text-[11px] uppercase ${s.tone}`}>
+                <span className={`font-pixel text-[8px] uppercase ${s.tone}`}>
                   <span aria-hidden="true">{s.icon} </span>
                   {s.label}
                 </span>

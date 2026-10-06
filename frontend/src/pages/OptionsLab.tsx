@@ -10,7 +10,7 @@ import { MetricsTable } from '../components/MetricsTable';
 import { Provenance } from '../components/Provenance';
 import { RealityCheckPanel } from '../components/RealityCheckPanel';
 import { pct, usd } from '../format';
-import { AgentAvatar } from '../game/AgentAvatar';
+import { AgentSprite } from '../game/AgentSprite';
 
 type RunState =
   | { kind: 'idle' }
@@ -41,10 +41,10 @@ function BeforeYouRun({ entry }: { entry: OptionsUniverseEntry }) {
       aria-label="Reality check before you run"
     >
       <div className="shrink-0">
-        <AgentAvatar agentId="auditor" size={32} />
+        <AgentSprite agentId="auditor" size={32} animate={false} />
       </div>
       <div className="min-w-0 text-sm">
-        <p className="font-display font-bold tracking-wide text-[11px] uppercase text-amber-300">
+        <p className="font-pixel text-[8px] uppercase text-amber-300">
           Reality check before you run · {entry.underlying} options
         </p>
         <ul className="mt-1.5 list-inside list-disc text-slate-300">
@@ -152,7 +152,7 @@ function OptionsResults({ report }: { report: OptionsReport }) {
           {report.events.map((e, i) => (
             <li key={`${e.day}-${String(i)}`} className="border-l-2 border-slate-700 pl-3">
               <span className="font-mono text-xs text-slate-500">{e.day}</span>{' '}
-              <span className="font-display font-bold tracking-wide text-[11px] uppercase text-sky-300">{e.kind}</span>
+              <span className="font-pixel text-[8px] uppercase text-sky-300">{e.kind}</span>
               <p className="text-slate-300">{e.text}</p>
             </li>
           ))}
@@ -373,7 +373,7 @@ function OptionsForm({
             <button
               type="submit"
               disabled={run.kind === 'running' || !entry || !strategy || barsId === null}
-              className="btn-game bg-sky-600 px-5 py-3 text-white hover:bg-sky-500 disabled:opacity-50"
+              className="btn-pixel bg-sky-600 px-5 py-3 text-white hover:bg-sky-500 disabled:opacity-50"
             >
               {run.kind === 'running' ? 'Running…' : 'Run options backtest'}
             </button>

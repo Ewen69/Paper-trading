@@ -1,9 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import '@fontsource/exo-2/400.css';
-import '@fontsource/exo-2/700.css';
-import '@fontsource/exo-2/800.css';
+import '@fontsource/press-start-2p/400.css';
 
 import { App } from './App';
 import './index.css';

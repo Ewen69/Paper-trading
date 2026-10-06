@@ -1,17 +1,12 @@
-import { lazy, Suspense } from 'react';
-
 import type { ApiState } from '../api/useApi';
 import type { GameState } from '../api/schemas';
 import { Card, NoData } from '../components/Card';
 import { HealthCard } from '../components/HealthCard';
 import { Provenance } from '../components/Provenance';
-import { AgentAvatar } from './AgentAvatar';
+import { AgentSprite } from './AgentSprite';
 import { AgentTile } from './AgentTile';
 import { GraduationGate } from './GraduationGate';
 import { timeOf } from './status';
-
-// three.js loads on demand in its own chunk, after the page is up.
-const HQScene = lazy(() => import('./three/HQScene').then((m) => ({ default: m.HQScene })));
 
 const MAX_EVENTS = 15;
 
@@ -29,7 +24,7 @@ function MissionLog({ game }: { game: GameState }) {
           {shown.map((e) => (
             <li key={`${e.at.toISOString()}-${e.kind}-${e.text}`} className="flex gap-3">
               <div className="shrink-0 pt-0.5">
-                <AgentAvatar agentId={e.agent} size={24} />
+                <AgentSprite agentId={e.agent} size={24} animate={false} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-slate-200">
@@ -41,7 +36,7 @@ function MissionLog({ game }: { game: GameState }) {
               </div>
               <div className="shrink-0 text-right">
                 <span
-                  className={`font-display font-bold tracking-wide text-[12px] ${e.xp > 0 ? 'text-amber-300' : 'text-slate-500'}`}
+                  className={`font-pixel text-[9px] ${e.xp > 0 ? 'text-amber-300' : 'text-slate-500'}`}
                 >
                   +{e.xp} XP
                 </span>
@@ -71,11 +66,11 @@ function Badges({ game }: { game: GameState }) {
             className={`border-2 p-3 ${b.earned ? 'border-amber-400/70 bg-amber-400/5' : 'border-slate-800 opacity-70'}`}
           >
             <p className="flex items-center justify-between gap-2">
-              <span className="font-display font-bold tracking-wide text-[12px] uppercase leading-relaxed text-slate-100">
+              <span className="font-pixel text-[9px] uppercase leading-relaxed text-slate-100">
                 {b.earned ? '★' : '☆'} {b.name}
               </span>
               <span
-                className={`font-display font-bold tracking-wide text-[10px] uppercase ${b.earned ? 'text-amber-300' : 'text-slate-500'}`}
+                className={`font-pixel text-[7px] uppercase ${b.earned ? 'text-amber-300' : 'text-slate-500'}`}
               >
                 {b.earned ? 'Earned' : 'Not yet'}
               </span>
@@ -100,7 +95,7 @@ function XpRules({ game }: { game: GameState }) {
         {game.xp_rules.map((r) => (
           <li key={r.id} className="flex justify-between gap-3">
             <span className="text-slate-300">{r.description}</span>
-            <span className="shrink-0 font-display font-bold tracking-wide text-[12px] text-amber-300">+{r.xp}</span>
+            <span className="shrink-0 font-pixel text-[9px] text-amber-300">+{r.xp}</span>
           </li>
         ))}
       </ul>
@@ -122,17 +117,12 @@ export function HQPage({ game }: { game: ApiState<GameState> }) {
         <>
           <section aria-label="Squad">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-display font-bold tracking-wide text-sm uppercase text-slate-100">The squad</h2>
+              <h2 className="font-pixel text-xs uppercase text-slate-100">The squad</h2>
               <Provenance source={game.data.source} asOf={game.data.as_of} asOfLabel="as of" />
             </div>
-            <div className="mb-4">
-              <Suspense fallback={<div className="hq-stage h-[340px] sm:h-[420px]" aria-busy="true" />}>
-                <HQScene agents={game.data.agents} />
-              </Suspense>
-            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {game.data.agents.map((agent) => (
-                <AgentTile key={agent.id} agent={agent} />
+              {game.data.agents.map((agent, i) => (
+                <AgentTile key={agent.id} agent={agent} index={i} />
               ))}
             </div>
           </section>

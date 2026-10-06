@@ -12,25 +12,6 @@ better than they are.
 - **Returns, wins and profit never earn XP.** There are no win streaks, no leaderboards, and no
   celebration animations for P&L.
 
-## Look and feel: a PS2-era 3D HQ
-
-- **HQ is a live 3D room** built with three.js:
-  - Low-poly, flat-shaded agents stand on glowing pads whose ring color repeats their status.
-  - There's fog, floating dust (from a fixed seed, never random), and glowing station signs.
-  - The scene renders at about half resolution and is scaled up, which gives the soft PS2
-    look. The camera orbits slowly; drag to look around.
-  - Click an active agent, or its name tag, to open that agent's station. Hover a locked
-    silhouette to see what unlocks it.
-- **Text stays HTML.** Name tags float over the canvas as real links, so they're crisp and
-  keyboard-focusable, and everything in the scene is also listed in the squad cards below it.
-- **Agent pictures elsewhere** (hotbar, cards, mission log, Reality Check) are the same 3D
-  models, rendered once offscreen at low resolution and cached.
-- **Fallbacks.** Without WebGL, HQ shows a notice and portraits become initials badges; the
-  rest of the app is unchanged. With reduced motion on, the camera, bobbing and glow
-  animations stop.
-- **Styling:** glossy beveled panels, gel buttons, and the Exo 2 display font (bundled
-  locally, so it works offline).
-
 ## Stations (hotkeys 1–4)
 
 | Key | Station | Agent | Shows |
