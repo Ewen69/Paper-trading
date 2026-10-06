@@ -1,0 +1,5 @@
+underlying,quote_date,expiration,strike,option_type,bid,ask,exercise_style,volume,open_interest,underlying_price
+SPY,2025-01-02,2025-01-17,585,C,8.10,8.20,american,1200,15000,584.64
+SPY,2025-01-02,2025-01-17,585,P,7.90,8.00,american,900,12000,584.64
+SPY,2025-01-03,2025-01-17,585,C,11.50,11.62,american,1500,15200,591.95
+SPY,2025-01-03,2025-01-17,585,P,4.95,5.05,american,1100,12100,591.95

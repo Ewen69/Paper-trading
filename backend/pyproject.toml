@@ -8,15 +8,22 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
+    "alpaca-py>=0.40",
+    "exchange-calendars>=4.5",
 ]
 
 [dependency-groups]
 dev = [
     "httpx2>=2.13",
     "mypy>=1.11",
+    "pandas-stubs>=3.0.5.260914",
     "pytest>=8.3",
     "ruff>=0.6",
+    "types-requests>=2.33.0.20260906",
 ]
+
+[project.scripts]
+ptl = "ptl.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -48,6 +55,11 @@ warn_unreachable = true
 files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+# Untyped; all use is contained in ptl/market_calendar.py.
+module = ["exchange_calendars", "exchange_calendars.*"]
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
@@ -56,4 +68,8 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Third-party: alpaca-py's (unused here) streaming module imports websockets.legacy.
+    "ignore:websockets.legacy is deprecated:DeprecationWarning",
+]

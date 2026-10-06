@@ -1,5 +1,6 @@
 import pytest
 
+from ptl.config import REPO_ROOT
 from ptl.safety import ALPACA_PAPER_BASE_URL
 from tests.conftest import SettingsFactory
 
@@ -14,6 +15,12 @@ def test_reads_environment(monkeypatch: pytest.MonkeyPatch, make_settings: Setti
     monkeypatch.setenv("ALPACA_API_KEY_ID", "key-id")
     monkeypatch.setenv("ALPACA_API_SECRET_KEY", "secret")
     assert make_settings().broker_credentials_configured is True
+
+
+def test_relative_database_path_is_anchored_to_repo(make_settings: SettingsFactory) -> None:
+    assert make_settings(database_path="data/x.sqlite3").database_path == (
+        REPO_ROOT / "data" / "x.sqlite3"
+    )
 
 
 def test_empty_keys_do_not_count_as_configured(make_settings: SettingsFactory) -> None:

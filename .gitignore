@@ -4,7 +4,7 @@
 !.env.example
 
 # Local data (SQLite, imported CSVs, net worth) stays on this machine
-data/
+/data/
 *.sqlite
 *.sqlite3
 *.db

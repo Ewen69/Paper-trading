@@ -6,9 +6,51 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 0 (scaffold)
+## Status: Phase 1 (data layer)
 
-### What Phase 0 does
+### What Phase 1 adds
+
+Details: [`docs/DATA.md`](docs/DATA.md).
+
+- **Provenance everywhere:** every value the API serves has `source`, `as_of`, `data_type`
+  (real-time / delayed / end-of-day / manual), and `stale`, plus a reason when it's stale.
+- **Live quotes (Alpaca):** the quote source sits behind a swappable `QuoteSource` interface;
+  `AlpacaQuoteSource` is the implementation. `GET /quotes/stock/{symbol}` and
+  `GET /quotes/option/{occ_symbol}` return bid, ask, sizes and spread (never a mid), with the feed's
+  data type and quality checks.
+  - Missing keys, missing quotes or API failures return a "No data: …" error, never a guess.
+  - Symbols are validated before any network call.
+- **Paper keys verified:** Data Health reads the paper account status (read-only, cached for
+  60s). The trading client can only be built through `make_paper_trading_client`, which checks the
+  endpoint before and after construction.
+- **CSV ingestion:** `npm run ptl -- import-csv` loads equity daily bars and option EOD quotes into
+  local SQLite.
+  - A file is imported all-or-nothing, with line-numbered errors.
+  - Re-importing the same file does nothing (SHA-256 hash).
+  - Column renaming (`--map`) and custom date formats are supported.
+- **Data-quality checks:** gaps against the real NYSE calendar (holidays and special closures
+  aren't gaps), impossible OHLC, crossed/locked markets, no offer, zero bid, quotes after expiry,
+  repeated quotes, extreme moves (often unadjusted splits), and live-quote staleness.
+  - Findings are stored and shown. Data is never fixed or dropped.
+- **Data Health page:** overall status, live source and feed types, a live quote check, and each
+  dataset with coverage, provenance, a stale flag and its findings. `GET /data/health` serves it.
+
+### Phase 1 limitations
+
+- **Free Alpaca data is limited.** Stock quotes come from IEX only (one venue, so spreads can be
+  wider than the market) and option quotes are delayed, modified "indicative" quotes. Both are
+  labeled. Neither should drive fill decisions.
+- **Without paper keys, nothing live works**, and the app says so. The live path is tested
+  against fake Alpaca clients, so the real connection is only proven once you add keys.
+- **Daily data only.** No intraday bars yet, and quality checks run per file, not across
+  overlapping datasets.
+- **The calendar covers 1990 to about a year ahead.** Dates outside that range can't be
+  checked for gaps and are flagged `outside_calendar`.
+- **Import is command-line only.** There's no upload button in the UI yet.
+- **No historical data ships with the app.** You bring your own CSVs. The files in
+  `backend/tests/fixtures` are synthetic and exist only for tests.
+
+### From Phase 0
 
 - **Repo layout:** `backend/` (Python 3.12, FastAPI, uv), `frontend/` (React, Vite, TypeScript,
   Tailwind), `docs/`, and root scripts that run both.
@@ -28,12 +70,7 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
   frontend: TypeScript strict (plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`),
   ESLint `strictTypeChecked` with `--max-warnings 0`, and Vitest.
 
-### Limitations (by design, for this phase)
-
-- No broker connection yet. "Paper API keys: present" means the keys are **set**, not that
-  they are **valid**. Phase 1 verifies them.
-- No market data, backtesting, trading, net worth, or portfolio features yet.
-- `as_of` on `/health` is the backend's clock at response time. There's no market data to date yet.
+Not built yet: backtesting, trading, net worth, and portfolio features.
 
 ## Prerequisites
 
@@ -54,7 +91,16 @@ npm run dev
 
 The API runs at http://127.0.0.1:8000 and the UI at http://localhost:5173.
 
-Optional: copy `.env.example` to `.env` and add your **paper** keys. The app runs without them.
+Optional: copy `.env.example` to `.env` and add your **paper** keys. The app runs without them,
+but live quotes will show "No data".
+
+To import historical data:
+
+```bash
+npm run ptl -- import-csv path/to/spy.csv --kind equity-bars --source "Vendor name"
+```
+
+Your data stays in `data/ptl.sqlite3`, which git ignores.
 
 ## Check everything
 

@@ -49,6 +49,8 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
 
 - `npm install` — first-time setup (installs root tools, runs `uv sync` and frontend install).
 - `npm run dev` — start backend (:8000) and frontend (:5173) together.
+- `npm run ptl -- <command>` — data CLI (`import-csv`, `datasets`, `delete-dataset`); see
+  `docs/DATA.md`.
 - `npm run check` — ruff, ruff format check, mypy, pytest, ESLint, tsc, Vitest. Must be clean
   (zero warnings) before any commit.
 
