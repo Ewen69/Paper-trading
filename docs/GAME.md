@@ -76,10 +76,10 @@ tracks.** Nothing reads it to change behavior, and no code path can enable live 
 
 | Item | Met when | Status today |
 |---|---|---|
-| 3 months of paper trading | 90+ days between first and latest paper trade | Not started (Phase 3) |
-| 200+ paper trades | 200 filled, logged paper trades | Not started (Phase 3) |
+| 3 months of paper trading | 90+ days between first and latest paper-account fill | From the paper log (fills only; dry runs never count) |
+| 200+ paper trades | 200 filled, logged paper-account trades | From the paper log (fills only; dry runs never count) |
 | Beats buy-and-hold out-of-sample | A symbol's **first** out-of-sample test has a 95% CI for annualized excess return (after costs) entirely above 0 | Computed from the run log |
-| Zero risk-limit breaches | No breaches or kill-switch trips during paper trading | Not started (Phase 3) |
+| Zero risk-limit breaches | No kill-switch trips from paper-account cycles (rejected orders are the limits working, not breaches) | From the risk decision log, once there are fills |
 
 Only first looks count. A later out-of-sample run that passes after an earlier one failed does
 not meet the item. Runs logged before CIs were stored count as "no stored CI", never as a pass.
@@ -105,7 +105,9 @@ Badges:
 ## Limitations
 
 - Agents restate computed facts; they are not AI yet. See the plan for AI-backed agents.
-- The paper-trading gate items stay "not started" until Phase 3 builds the paper runner and
-  risk limits.
+- The paper-trading gate items stay "not started" until the Alpaca paper account has fills.
+  Dry runs never count.
+- Risk Officer and Paper Trader report on HQ. Their live status and controls are in the City
+  (`docs/AGENTS.md`).
 - Runs logged before this phase have no stored warnings or CIs. The Auditor and the gate treat
   them as unknown, never as clean.

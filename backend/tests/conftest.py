@@ -45,6 +45,7 @@ def make_settings(db_path: Path) -> SettingsFactory:
 
     def _make(**overrides: object) -> Settings:
         overrides.setdefault("database_path", db_path)
+        overrides.setdefault("agents_autopilot", False)  # tests drive agents explicitly
         return Settings(_env_file=None, **overrides)  # type: ignore[arg-type]
 
     return _make

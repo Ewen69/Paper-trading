@@ -3,6 +3,10 @@ import type { z } from 'zod';
 import {
   dataHealthSchema,
   gameStateSchema,
+  jobSchema,
+  liveAgentSchema,
+  paperLogSchema,
+  riskStateSchema,
   optionsReportSchema,
   optionsUniverseSchema,
   healthSchema,
@@ -109,3 +113,39 @@ export interface OptionsRunPayload {
 
 export const runOptionsBacktest = (payload: OptionsRunPayload) =>
   postJson('/backtest/options/runs', payload, optionsReportSchema);
+
+// ---- Live agents, risk, paper runner ----
+
+export const startSweep = (body: {
+  asset: 'equity' | 'options';
+  strategy: string;
+  symbol: string;
+  dataset_id: number;
+  options_dataset_id?: number;
+  promote: boolean;
+}) => postJson('/agents/sweeps', body, jobSchema);
+
+export const startDataCheck = () => postJson('/agents/data-check', {}, jobSchema);
+
+export const setAutopilot = (agentId: string, enabled: boolean) =>
+  postJson(`/agents/${encodeURIComponent(agentId)}/autopilot`, { enabled }, liveAgentSchema);
+
+export const fetchRiskState = (signal?: AbortSignal) =>
+  getJson('/risk/state', riskStateSchema, signal);
+
+export const setKillSwitch = (engaged: boolean, reason: string) =>
+  postJson('/risk/kill-switch', { engaged, reason }, riskStateSchema);
+
+export const startPaperCycle = (body: {
+  strategy: string;
+  dataset_id: number;
+  symbol: string;
+  dry_run: boolean;
+}) => postJson('/paper/cycles', body, jobSchema);
+
+export const fetchPaperLog = (signal?: AbortSignal) =>
+  getJson('/paper/log', paperLogSchema, signal);
+
+/** ws:// URL for the live activity stream, through the Vite proxy. */
+export const activityUrl = () =>
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/ws/activity`;

@@ -6,11 +6,59 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 2b (options backtesting)
+## Status: Phase 3 (live agents, risk engine, paper runner)
 
-Next: Phase 3 (strategy interface and paper runner). See [`docs/PLAN.md`](docs/PLAN.md).
+Next: Phase 4 (net worth tracker). See [`docs/PLAN.md`](docs/PLAN.md).
 
-### What Phase 2b adds
+### What Phase 3 adds
+
+Details: [`docs/AGENTS.md`](docs/AGENTS.md).
+
+- **The City, now the default screen (`#city`).** It's an isometric 3D view (three.js via
+  react-three-fiber) with four sectors: Data Ingestion, Strategy Research, Options Risk and the
+  Execution Hub.
+  - Agents are geometric nodes. A running node pulses, streams particles, and floats a label
+    with the exact parameters it's testing.
+  - Empty slots wait for future sub-agents.
+  - Panels below the view carry every detail and control, so the page works without WebGL.
+  - Live over a WebSocket (`/api/ws/activity`), with every message validated.
+- **Live agent runtime:**
+  - one asyncio worker and queue per agent
+  - jobs and findings (win rate, Sharpe, trades, run #) are logged to SQLite
+  - autopilot queues untried work
+- **Sweeps stay honest:**
+  - in-sample only, and every combination is a counted trial
+  - re-runs reuse existing runs
+  - one finalist may get a single counted out-of-sample test, never repeated
+  - autopilot never touches the holdout
+- **Strategy plugin architecture:** a `Strategy` base class, typed params and sweep grids, an
+  `@register` registry, and auto-loaded `ptl/strategy/plugins/` (example: `trend_filter`).
+- **Risk engine in code:**
+  - max loss per trade, max daily loss (a breach trips the kill switch), max open positions,
+    max capital at risk
+  - defined risk only
+  - every decision is stored with its arithmetic
+  - the kill switch is in the UI and the command line
+- **Paper runner, with dry run as the default.** Paper mode sends to the Alpaca **paper**
+  account only, and the paper URL is re-checked before every submit.
+  - Stale signals are refused.
+  - Cycles, risk decisions, orders and status events are append-only.
+- **HQ and the Graduation Gate are updated.** Risk Officer and Paper Trader are unlocked, and
+  the gate now counts real paper-account fills (dry runs never count).
+
+### Phase 3 limitations
+
+- **Options paper trading isn't built.** The paper runner is equity-only, and options stay
+  backtest-only.
+- **The agents are deterministic job runners, not AI.** AI agents with a Claude lead reviewer
+  come later.
+- **The runtime is single-process and in-memory.** Queued jobs don't survive a restart.
+- **Orders are whole-share market DAY orders.** Limit orders and partial-fill logic aren't
+  built.
+- **Current bars must be imported by hand.** There is no automatic bar download.
+- **The 3D view is a lazily loaded ~250 kB (gzipped) chunk.** Vite warns about its size.
+
+### What Phase 2b added
 
 Details and a worked example: [`docs/OPTIONS.md`](docs/OPTIONS.md).
 

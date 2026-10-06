@@ -5,11 +5,16 @@ object exists, so a misconfigured endpoint means the server never starts.
 """
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
 from ptl import __version__
+from ptl.agents.runtime import AgentRuntime, BrokerFactory
+from ptl.api.live import build_live_router
+from ptl.api.ws import build_ws_router
 from ptl.backtest_api import build_backtest_router
 from ptl.config import Settings
 from ptl.data.alpaca_source import AlpacaQuoteSource
@@ -19,6 +24,7 @@ from ptl.db import migrate, open_db
 from ptl.game import build_game_router
 from ptl.health import build_health_router
 from ptl.market_calendar import MarketCalendar
+from ptl.paper.factory import broker_factory
 from ptl.safety import assert_paper_endpoint
 
 logger = logging.getLogger(__name__)
@@ -39,6 +45,7 @@ def create_app(
     quote_source: QuoteSource | None = None,
     calendar: MarketCalendar | None = None,
     clock: Clock = utc_now,
+    brokers: BrokerFactory | None = None,
 ) -> FastAPI:
     _configure_logging()
     settings = settings if settings is not None else Settings()
@@ -55,7 +62,26 @@ def create_app(
 
     calendar = calendar if calendar is not None else MarketCalendar()
     source = quote_source if quote_source is not None else AlpacaQuoteSource(settings, clock)
-    app = FastAPI(title="Paper Trading Lab", version=__version__)
+    runtime = AgentRuntime(
+        settings,
+        calendar=calendar,
+        clock=clock,
+        source=source,
+        broker_factory=brokers if brokers is not None else broker_factory(settings),
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        await runtime.start()
+        try:
+            yield
+        finally:
+            await runtime.stop()
+
+    app = FastAPI(title="Paper Trading Lab", version=__version__, lifespan=lifespan)
+    app.state.runtime = runtime
+    app.include_router(build_ws_router(runtime))
+    app.include_router(build_live_router(settings, runtime, clock))
     app.include_router(build_health_router(settings, paper_base_url))
     app.include_router(build_data_router(settings, source, calendar, clock))
     app.include_router(build_backtest_router(settings, calendar, clock))

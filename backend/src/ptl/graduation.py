@@ -11,12 +11,15 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel
 
 from ptl.backtest.repository import RunRecord
+from ptl.paper.store import PaperEvidence
 
 GateStatus = Literal["met", "not_met", "not_started"]
 
 PAPER_DAYS_TARGET = 90
 PAPER_TRADES_TARGET = 200
-PAPER_SOURCE = "Paper trading log (built in Phase 3; no paper trading has happened yet)"
+PAPER_SOURCE = (
+    "Paper trading log: Alpaca paper-account fills only; dry runs never count (local SQLite)"
+)
 GATE_NOTE = (
     "Tracking only. Meeting every item does not, and cannot, enable live trading in this app."
 )
@@ -96,42 +99,75 @@ def _oos_edge(runs: Sequence[RunRecord], now: datetime) -> GateItem:
     )
 
 
-def compute_graduation(runs: Sequence[RunRecord], now: datetime) -> GraduationOut:
-    items = [
+def _paper_items(paper: PaperEvidence, now: datetime) -> list[GateItem]:
+    as_of = paper.last_fill or now
+    days = (paper.last_fill - paper.first_fill).days if paper.first_fill and paper.last_fill else 0
+    started = paper.filled_trades > 0
+
+    def status(met: bool) -> GateStatus:
+        return "met" if met else "not_met" if started else "not_started"
+
+    span = (
+        f"First fill {paper.first_fill.date()}, latest {paper.last_fill.date()}."
+        if paper.first_fill and paper.last_fill
+        else None
+    )
+    return [
         GateItem(
             id="paper_days",
             title="3 months of paper trading",
             requirement=(
                 f"At least {PAPER_DAYS_TARGET} days between the first and latest paper trade."
             ),
-            status="not_started",
-            progress=f"0 of {PAPER_DAYS_TARGET} days. Paper trading arrives in Phase 3.",
-            evidence=None,
+            status=status(days >= PAPER_DAYS_TARGET),
+            progress=f"{days} of {PAPER_DAYS_TARGET} days.",
+            evidence=span,
             source=PAPER_SOURCE,
-            as_of=now,
+            as_of=as_of,
         ),
         GateItem(
             id="paper_trades",
             title=f"{PAPER_TRADES_TARGET}+ paper trades",
             requirement=f"At least {PAPER_TRADES_TARGET} filled paper trades, all logged.",
-            status="not_started",
-            progress=f"0 of {PAPER_TRADES_TARGET} trades. Paper trading arrives in Phase 3.",
-            evidence=None,
+            status=status(paper.filled_trades >= PAPER_TRADES_TARGET),
+            progress=f"{paper.filled_trades} of {PAPER_TRADES_TARGET} trades.",
+            evidence=span,
             source=PAPER_SOURCE,
-            as_of=now,
-        ),
-        _oos_edge(runs, now),
-        GateItem(
-            id="zero_breaches",
-            title="Zero risk-limit breaches",
-            requirement="No risk-limit breaches or kill-switch trips during paper trading.",
-            status="not_started",
-            progress="Nothing to check until paper trading and risk limits exist (Phase 3).",
-            evidence=None,
-            source=PAPER_SOURCE,
-            as_of=now,
+            as_of=as_of,
         ),
     ]
+
+
+def _zero_breaches(paper: PaperEvidence, now: datetime) -> GateItem:
+    if paper.filled_trades == 0:
+        gate: GateStatus = "not_started"
+        progress = "Nothing to check until there are paper-account fills."
+    elif paper.kill_switch_trips:
+        gate = "not_met"
+        progress = f"{paper.kill_switch_trips} kill-switch trip(s) from the daily loss limit."
+    else:
+        gate = "met"
+        progress = (
+            f"No trips across {paper.decisions} risk decision(s). Rejected orders are the "
+            "limits working, not breaches."
+        )
+    return GateItem(
+        id="zero_breaches",
+        title="Zero risk-limit breaches",
+        requirement="No risk-limit breaches or kill-switch trips during paper trading.",
+        status=gate,
+        progress=progress,
+        evidence=None,
+        source="Risk decision log for paper-account cycles (local SQLite)",
+        as_of=now,
+    )
+
+
+def compute_graduation(
+    runs: Sequence[RunRecord], paper: PaperEvidence, now: datetime
+) -> GraduationOut:
+    days, trades = _paper_items(paper, now)
+    items = [days, trades, _oos_edge(runs, now), _zero_breaches(paper, now)]
     return GraduationOut(
         items=items,
         met=sum(1 for i in items if i.status == "met"),

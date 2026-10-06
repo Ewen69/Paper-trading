@@ -2,15 +2,24 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import ClassVar
 
-from ptl.backtest.strategies import ParamSpec, resolve_params
 from ptl.options.engine import CloseIntent, Intent, OpenIntent, OptionsStrategy, OptionsView
 from ptl.options.models import Leg, Quote
+from ptl.strategy.base import (
+    OptionStrategy,
+    ParamSpec,
+    load_plugins,
+    option_strategies,
+    register,
+    resolve_params,
+)
 
 _STRIKE_TOLERANCE = 1e-9
 
 
-class PutCreditSpread:
+@register
+class PutCreditSpread(OptionStrategy):
     """Sell an out-of-the-money put vertical; take profit early or hold to expiration.
 
     Open (when fewer than `max_open` positions are open):
@@ -21,7 +30,26 @@ class PutCreditSpread:
     `take_profit` % of the credit. 0 means hold to expiration.
     """
 
-    warmup = 0
+    id = "put_credit_spread"
+    name = "Put credit spread"
+    description = (
+        "Sell an out-of-the-money put vertical (defined risk). Short strike sits a fixed percent "
+        "below the close; the long strike is a fixed width lower. Take profit at a share of the "
+        "credit, or hold to expiration. Orders fill at the next session's bid/ask."
+    )
+    params: ClassVar[tuple[ParamSpec, ...]] = (
+        ParamSpec("dte", "Min days to expiration", 30, 1, 120, "Calendar days."),
+        ParamSpec("otm_percent", "Short strike % below close", 5, 0, 30, "Percent."),
+        ParamSpec("width", "Spread width ($)", 5, 1, 100, "Strike distance."),
+        ParamSpec("contracts", "Contracts", 1, 1, 50, "Spreads per entry."),
+        ParamSpec("take_profit", "Take profit (% of credit)", 50, 0, 100, "0 = hold."),
+        ParamSpec("max_open", "Max open spreads", 1, 1, 10, "At a time."),
+    )
+    sweep_grid: ClassVar[dict[str, list[int]]] = {
+        "dte": [30, 45],
+        "otm_percent": [3, 5, 8],
+        "take_profit": [0, 50],
+    }
 
     def __init__(  # noqa: PLR0913
         self,
@@ -123,38 +151,14 @@ class OptionsStrategySpec:
         return self.build(resolved), resolved
 
 
-def _put_credit_spread(p: Mapping[str, int]) -> OptionsStrategy:
-    return PutCreditSpread(
-        dte=p["dte"],
-        otm_percent=p["otm_percent"],
-        width=p["width"],
-        contracts=p["contracts"],
-        take_profit=p["take_profit"],
-        max_open=p["max_open"],
-    )
+def _spec(cls: type[OptionStrategy]) -> OptionsStrategySpec:
+    def build(params: Mapping[str, int]) -> OptionsStrategy:
+        return cls(**params)
+
+    return OptionsStrategySpec(cls.id, cls.name, cls.description, cls.params, build)
 
 
+load_plugins()
 OPTIONS_STRATEGIES: dict[str, OptionsStrategySpec] = {
-    spec.id: spec
-    for spec in (
-        OptionsStrategySpec(
-            id="put_credit_spread",
-            name="Put credit spread",
-            description=(
-                "Sell an out-of-the-money put vertical (defined risk). Short strike sits a fixed "
-                "percent below the close; the long strike is a fixed width lower. Take profit "
-                "at a share of the credit, or hold to expiration. Orders fill at the next "
-                "session's bid/ask."
-            ),
-            params=(
-                ParamSpec("dte", "Min days to expiration", 30, 1, 120, "Calendar days."),
-                ParamSpec("otm_percent", "Short strike % below close", 5, 0, 30, "Percent."),
-                ParamSpec("width", "Spread width ($)", 5, 1, 100, "Strike distance."),
-                ParamSpec("contracts", "Contracts", 1, 1, 50, "Spreads per entry."),
-                ParamSpec("take_profit", "Take profit (% of credit)", 50, 0, 100, "0 = hold."),
-                ParamSpec("max_open", "Max open spreads", 1, 1, 10, "At a time."),
-            ),
-            build=_put_credit_spread,
-        ),
-    )
+    sid: _spec(c) for sid, c in option_strategies().items()
 }

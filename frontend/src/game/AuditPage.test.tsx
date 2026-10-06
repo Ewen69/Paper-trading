@@ -36,7 +36,7 @@ describe('Auditor station', () => {
     expect(screen.getByText(/cannot, enable live trading/)).toBeInTheDocument();
     const trades = screen.getByText('200+ paper trades').closest('li');
     expect(trades).toHaveTextContent('Not started');
-    expect(trades).toHaveTextContent('0 of 200 trades. Paper trading arrives in Phase 3.');
+    expect(trades).toHaveTextContent('0 of 200 trades.');
     const edge = screen.getByText('Beats buy-and-hold out-of-sample').closest('li');
     expect(edge).toHaveTextContent('Not met');
   });

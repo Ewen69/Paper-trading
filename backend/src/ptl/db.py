@@ -126,6 +126,125 @@ MIGRATIONS: tuple[str, ...] = (
     """
     CREATE INDEX option_quotes_by_day ON option_quotes (dataset_id, underlying, quote_date);
     """,
+    # 5: risk engine state, paper trading log, and the agent subsystem.
+    """
+    CREATE TABLE risk_state (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        engaged    INTEGER NOT NULL,
+        reason     TEXT NOT NULL,
+        changed_at TEXT NOT NULL
+    );
+    CREATE TABLE risk_decisions (
+        id         INTEGER PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        source     TEXT NOT NULL,
+        symbol     TEXT NOT NULL,
+        order_text TEXT NOT NULL,
+        approved   INTEGER NOT NULL,
+        checks     TEXT NOT NULL,
+        tripped    INTEGER NOT NULL
+    );
+
+    CREATE TABLE paper_runners (
+        id         INTEGER PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        strategy   TEXT NOT NULL,
+        params     TEXT NOT NULL,
+        dataset_id INTEGER NOT NULL,
+        symbol     TEXT NOT NULL,
+        dry_run    INTEGER NOT NULL,
+        active     INTEGER NOT NULL
+    );
+    CREATE TABLE paper_cycles (
+        id            INTEGER PRIMARY KEY,
+        runner_id     INTEGER,
+        created_at    TEXT NOT NULL,
+        session       TEXT NOT NULL,
+        mode          TEXT NOT NULL CHECK (mode IN ('dry_run', 'paper')),
+        strategy      TEXT NOT NULL,
+        params        TEXT NOT NULL,
+        symbol        TEXT NOT NULL,
+        explanation   TEXT NOT NULL,
+        target        REAL,
+        price         REAL,
+        price_source  TEXT NOT NULL,
+        current_qty   REAL,
+        desired_qty   REAL,
+        outcome       TEXT NOT NULL
+    );
+    CREATE TABLE paper_orders (
+        id               INTEGER PRIMARY KEY,
+        cycle_id         INTEGER NOT NULL REFERENCES paper_cycles (id),
+        created_at       TEXT NOT NULL,
+        mode             TEXT NOT NULL CHECK (mode IN ('dry_run', 'paper')),
+        symbol           TEXT NOT NULL,
+        side             TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+        qty              REAL NOT NULL,
+        reason           TEXT NOT NULL,
+        risk_decision_id INTEGER NOT NULL REFERENCES risk_decisions (id),
+        broker_order_id  TEXT,
+        status           TEXT NOT NULL
+    );
+    CREATE TABLE paper_order_events (
+        id          INTEGER PRIMARY KEY,
+        order_id    INTEGER NOT NULL REFERENCES paper_orders (id),
+        at          TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        filled_qty  REAL,
+        fill_price  REAL,
+        detail      TEXT NOT NULL
+    );
+
+    CREATE TABLE agent_jobs (
+        id          INTEGER PRIMARY KEY,
+        agent_id    TEXT NOT NULL,
+        kind        TEXT NOT NULL,
+        spec        TEXT NOT NULL,
+        status      TEXT NOT NULL CHECK (status IN ('queued', 'running', 'done', 'failed')),
+        created_at  TEXT NOT NULL,
+        started_at  TEXT,
+        finished_at TEXT,
+        summary     TEXT
+    );
+    CREATE TABLE agent_findings (
+        id                INTEGER PRIMARY KEY,
+        job_id            INTEGER NOT NULL REFERENCES agent_jobs (id),
+        agent_id          TEXT NOT NULL,
+        created_at        TEXT NOT NULL,
+        symbol            TEXT NOT NULL,
+        strategy          TEXT NOT NULL,
+        params            TEXT NOT NULL,
+        period            TEXT NOT NULL,
+        run_id            INTEGER,
+        trades            INTEGER,
+        win_rate          REAL,
+        sharpe            REAL,
+        total_return      REAL,
+        excess_annualized REAL,
+        note              TEXT NOT NULL
+    );
+
+    CREATE TRIGGER risk_decisions_no_update BEFORE UPDATE ON risk_decisions
+    BEGIN SELECT RAISE(ABORT, 'the risk decision log is append-only'); END;
+    CREATE TRIGGER risk_decisions_no_delete BEFORE DELETE ON risk_decisions
+    BEGIN SELECT RAISE(ABORT, 'the risk decision log is append-only'); END;
+    CREATE TRIGGER paper_cycles_no_update BEFORE UPDATE ON paper_cycles
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER paper_cycles_no_delete BEFORE DELETE ON paper_cycles
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER paper_orders_no_update BEFORE UPDATE ON paper_orders
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER paper_orders_no_delete BEFORE DELETE ON paper_orders
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER paper_order_events_no_update BEFORE UPDATE ON paper_order_events
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER paper_order_events_no_delete BEFORE DELETE ON paper_order_events
+    BEGIN SELECT RAISE(ABORT, 'the paper trading log is append-only'); END;
+    CREATE TRIGGER agent_findings_no_update BEFORE UPDATE ON agent_findings
+    BEGIN SELECT RAISE(ABORT, 'agent findings are append-only'); END;
+    CREATE TRIGGER agent_findings_no_delete BEFORE DELETE ON agent_findings
+    BEGIN SELECT RAISE(ABORT, 'agent findings are append-only'); END;
+    """,
 )
 
 

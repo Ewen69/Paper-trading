@@ -410,3 +410,159 @@ export type ResultCore = Pick<
   | 'reality_check'
   | 'provenance'
 >;
+
+// ---- Live agents (WebSocket + REST) ----
+
+export const liveAgentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  sector: z.string(),
+  role: z.string(),
+  status: z.enum(['idle', 'queued', 'running', 'error', 'watching']),
+  message: z.string(),
+  job_id: z.number().int().nullable(),
+  params: z.record(z.string(), z.number()).nullable(),
+  progress_done: z.number().int().nullable(),
+  progress_total: z.number().int().nullable(),
+  queued: z.number().int(),
+  autopilot: z.boolean(),
+  updated_at: isoDateTime,
+});
+export type LiveAgent = z.infer<typeof liveAgentSchema>;
+
+export const findingSchema = z.object({
+  id: z.number().int(),
+  job_id: z.number().int(),
+  agent_id: z.string(),
+  created_at: isoDateTime,
+  symbol: z.string(),
+  strategy: z.string(),
+  params: z.record(z.string(), z.number()),
+  period: z.string(),
+  run_id: z.number().int().nullable(),
+  trades: z.number().int().nullable(),
+  win_rate: z.number().nullable(),
+  sharpe: z.number().nullable(),
+  total_return: z.number().nullable(),
+  excess_annualized: z.number().nullable(),
+  note: z.string(),
+});
+export type Finding = z.infer<typeof findingSchema>;
+
+export const sectorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  purpose: z.string(),
+  slots: z.number().int(),
+  agents: z.array(z.string()),
+});
+export type Sector = z.infer<typeof sectorSchema>;
+
+const killSwitchSchema = z.object({
+  engaged: z.boolean(),
+  reason: z.string(),
+  changed_at: isoDateTime.nullable(),
+});
+
+export const snapshotSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  sectors: z.array(sectorSchema),
+  agents: z.array(liveAgentSchema),
+  findings: z.array(findingSchema),
+  kill_switch: killSwitchSchema,
+});
+export type Snapshot = z.infer<typeof snapshotSchema>;
+
+export const activityEventSchema = z.discriminatedUnion('type', [
+  snapshotSchema.extend({ type: z.literal('snapshot') }),
+  z.object({ type: z.literal('agent'), agent: liveAgentSchema }),
+  z.object({ type: z.literal('finding'), finding: findingSchema }),
+  z.object({ type: z.literal('kill_switch'), engaged: z.boolean(), reason: z.string() }),
+]);
+export type ActivityEvent = z.infer<typeof activityEventSchema>;
+
+export const jobSchema = z.object({
+  job_id: z.number().int(),
+  agent_id: z.string(),
+  kind: z.string(),
+});
+
+export const riskStateSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  kill_switch_engaged: z.boolean(),
+  kill_switch_reason: z.string(),
+  kill_switch_changed_at: isoDateTime.nullable(),
+  limits: z.object({
+    max_loss_per_trade: z.number(),
+    max_daily_loss: z.number(),
+    max_open_positions: z.number().int(),
+    max_capital_at_risk_pct: z.number(),
+  }),
+  decisions: z.array(
+    z.object({
+      id: z.number().int(),
+      created_at: isoDateTime,
+      source: z.string(),
+      symbol: z.string(),
+      order_text: z.string(),
+      approved: z.boolean(),
+      checks: z.array(z.object({ name: z.string(), passed: z.boolean(), detail: z.string() })),
+      tripped: z.boolean(),
+    }),
+  ),
+});
+export type RiskState = z.infer<typeof riskStateSchema>;
+
+export const paperLogSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  runners: z.array(
+    z.object({
+      id: z.number().int(),
+      created_at: isoDateTime,
+      strategy: z.string(),
+      params: z.record(z.string(), z.number()),
+      dataset_id: z.number().int(),
+      symbol: z.string(),
+      dry_run: z.boolean(),
+      active: z.boolean(),
+    }),
+  ),
+  cycles: z.array(
+    z.object({
+      id: z.number().int(),
+      runner_id: z.number().int().nullable(),
+      created_at: isoDateTime,
+      session: isoDate,
+      mode: z.string(),
+      strategy: z.string(),
+      symbol: z.string(),
+      explanation: z.string(),
+      target: z.number().nullable(),
+      price: z.number().nullable(),
+      price_source: z.string(),
+      current_qty: z.number().nullable(),
+      desired_qty: z.number().nullable(),
+      outcome: z.string(),
+    }),
+  ),
+  orders: z.array(
+    z.object({
+      id: z.number().int(),
+      cycle_id: z.number().int(),
+      created_at: isoDateTime,
+      mode: z.string(),
+      symbol: z.string(),
+      side: z.string(),
+      qty: z.number(),
+      reason: z.string(),
+      risk_decision_id: z.number().int(),
+      broker_order_id: z.string().nullable(),
+      status: z.string(),
+      latest_status: z.string(),
+    }),
+  ),
+});
+export type PaperLog = z.infer<typeof paperLogSchema>;
