@@ -1,4 +1,4 @@
-"""Command-line tools: `ptl import-csv`, `ptl datasets`, `ptl delete-dataset`.
+"""Command-line tools: import-csv, datasets, delete-dataset, paper-cycle, kill-switch.
 
 Run from the repo root as `npm run ptl -- <command> ...`.
 """
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ptl.config import Settings
 from ptl.data import repository
+from ptl.data.alpaca_source import AlpacaQuoteSource
 from ptl.data.csv_ingest import (
     ALLOWED_DATA_TYPES,
     DEFAULT_DATE_FORMAT,
@@ -21,7 +22,10 @@ from ptl.data.csv_ingest import (
 from ptl.data.models import DatasetKind
 from ptl.db import migrate, open_db
 from ptl.market_calendar import MarketCalendar
+from ptl.paper.factory import broker_factory
+from ptl.paper.runner import CycleRefusedError, CycleRequest, run_cycle
 from ptl.provenance import DataType
+from ptl.risk import store as risk_store
 
 _KINDS = {"equity-bars": DatasetKind.EQUITY_BARS, "option-quotes": DatasetKind.OPTION_QUOTES}
 
@@ -66,7 +70,65 @@ def _parser() -> argparse.ArgumentParser:
 
     delete = sub.add_parser("delete-dataset", help="remove an imported dataset and its rows")
     delete.add_argument("dataset_id", type=int)
+
+    cycle = sub.add_parser(
+        "paper-cycle", help="run one paper-trading cycle (dry run unless --paper is given)"
+    )
+    cycle.add_argument("--strategy", required=True)
+    cycle.add_argument("--dataset", type=int, required=True, help="equity bars dataset id")
+    cycle.add_argument("--symbol", required=True)
+    cycle.add_argument("--param", action="append", default=[], metavar="NAME=INT")
+    mode = cycle.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="log only; never send (default)")
+    mode.add_argument("--paper", action="store_true", help="send to the Alpaca PAPER account")
+
+    kill = sub.add_parser("kill-switch", help="engage or release the risk kill switch")
+    kill.add_argument("state", choices=["on", "off"])
+    kill.add_argument("--reason", required=True)
     return parser
+
+
+def _parse_params(pairs: Sequence[str]) -> dict[str, int]:
+    params: dict[str, int] = {}
+    for pair in pairs:
+        name, sep, value = pair.partition("=")
+        if not sep or not value.strip().lstrip("-").isdigit():
+            raise SystemExit(f"--param expects NAME=INTEGER, got {pair!r}")
+        params[name.strip()] = int(value)
+    return params
+
+
+def _paper_cycle(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
+    settings = Settings()
+    now = datetime.now(UTC)
+    calendar = MarketCalendar()
+    try:
+        broker = broker_factory(settings)(not args.paper)
+        result = run_cycle(
+            conn,
+            CycleRequest(args.strategy, _parse_params(args.param), args.dataset, args.symbol),
+            settings=settings,
+            broker=broker,
+            quotes=AlpacaQuoteSource(settings, lambda: datetime.now(UTC)),
+            calendar=calendar,
+            now=now,
+        )
+    except CycleRefusedError as exc:
+        _out(f"Refused: {exc}")
+        return 1
+    _out(f"Cycle #{result.cycle_id} ({result.mode}, session {result.session})")
+    _out(f"  Signal: {result.explanation}")
+    if result.decision is not None:
+        for check in result.decision.checks:
+            _out(f"  Risk {'PASS' if check.passed else 'FAIL'} {check.name}: {check.detail}")
+    _out(f"  Outcome: {result.outcome}")
+    return 0
+
+
+def _kill_switch(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
+    switch = risk_store.set_kill_switch(conn, args.state == "on", args.reason, datetime.now(UTC))
+    _out(f"Kill switch {'ENGAGED' if switch.engaged else 'released'}: {switch.reason}")
+    return 0
 
 
 def _import(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
@@ -123,7 +185,13 @@ def _delete(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
     return 1
 
 
-_COMMANDS = {"import-csv": _import, "datasets": _list, "delete-dataset": _delete}
+_COMMANDS = {
+    "import-csv": _import,
+    "datasets": _list,
+    "delete-dataset": _delete,
+    "paper-cycle": _paper_cycle,
+    "kill-switch": _kill_switch,
+}
 
 
 def main(argv: Sequence[str] | None = None) -> int:

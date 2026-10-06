@@ -28,8 +28,8 @@ def client(make_settings: SettingsFactory, tmp_path: Path, calendar: MarketCalen
 def test_strategies_endpoint(client: TestClient) -> None:
     body = client.get("/backtest/strategies").json()
     ids = [s["id"] for s in body]
-    assert ids == ["buy_and_hold", "sma_crossover", "put_credit_spread"]
-    assert [s["asset"] for s in body] == ["equity", "equity", "options"]
+    assert ids == ["buy_and_hold", "sma_crossover", "trend_filter", "put_credit_spread"]
+    assert [s["asset"] for s in body] == ["equity", "equity", "equity", "options"]
     fast = body[1]["params"][0]
     assert (fast["name"], fast["default"], fast["minimum"]) == ("fast", 50, 2)
 

@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     # Cache for the broker reachability check so Data Health doesn't hit Alpaca every refresh.
     broker_status_cache_seconds: int = Field(default=60, ge=0)
 
+    # Risk limits, enforced in code on every paper order (see ptl/risk/engine.py).
+    risk_max_loss_per_trade: float = Field(default=1_000.0, gt=0)
+    risk_max_daily_loss: float = Field(default=2_000.0, gt=0)
+    risk_max_open_positions: int = Field(default=5, ge=1)
+    risk_max_capital_at_risk_pct: float = Field(default=0.5, gt=0, le=1)
+
+    # Agents: background research workers (in-sample sweeps only) and the paper runner.
+    agents_autopilot: bool = True
+    agents_poll_seconds: float = Field(default=30.0, gt=0)
+    agents_max_combinations: int = Field(default=50, ge=1)
+    paper_dry_run_capital: float = Field(default=100_000.0, gt=0)
+
     @field_validator("database_path")
     @classmethod
     def _anchor_to_repo(cls, path: Path) -> Path:

@@ -298,6 +298,7 @@ def run_summary(perf: Performance, excess: Estimate) -> dict[str, float | int | 
         "sharpe": perf.sharpe.value,
         "max_drawdown": perf.max_drawdown,
         "trades": perf.trade_count,
+        "win_rate": perf.win_rate.value,
         "excess_annualized_return": excess.value,
         "excess_ci_low": excess.ci.low if excess.ci else None,
         "excess_ci_high": excess.ci.high if excess.ci else None,

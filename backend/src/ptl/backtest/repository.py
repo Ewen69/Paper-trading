@@ -227,6 +227,18 @@ def list_runs(conn: sqlite3.Connection, limit: int = 200) -> list[RunRecord]:
     return [_run_record(r) for r in rows]
 
 
+def find_run(
+    conn: sqlite3.Connection, symbol: str, strategy: str, params: Mapping[str, int], period: Period
+) -> RunRecord | None:
+    """The latest run of exactly this strategy + parameters on this symbol and period."""
+    row = conn.execute(
+        "SELECT * FROM backtest_runs WHERE symbol = ? AND strategy = ? AND params = ? "
+        "AND period = ? ORDER BY id DESC LIMIT 1",
+        (symbol, strategy, canonical_json(params), period),
+    ).fetchone()
+    return None if row is None else _run_record(row)
+
+
 def all_runs(conn: sqlite3.Connection) -> list[RunRecord]:
     """The whole append-only log, oldest first."""
     return [_run_record(r) for r in conn.execute("SELECT * FROM backtest_runs ORDER BY id")]
