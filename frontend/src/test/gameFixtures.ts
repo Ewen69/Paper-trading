@@ -70,7 +70,6 @@ export const gameStatePayload = {
         ),
       ],
     },
-    lockedAgent('analyst', 'Analyst', 'Phase 5'),
     lockedAgent('lead', 'Lead Reviewer', 'AI agents phase'),
   ],
   events: [

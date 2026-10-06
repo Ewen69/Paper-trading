@@ -66,6 +66,11 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   - Balances are carried forward, never interpolated.
   - Projections are labeled assumptions and are refused for net worth of zero or less.
   - Agents and HQ never show net-worth amounts.
+- Portfolio (`ptl/portfolio`, frontend `src/portfolio`):
+  - Every value names its price source and date.
+  - Unpriced holdings are listed, never guessed.
+  - Paper positions are read-only and kept as a separate book.
+  - Tips are rules that show the observed value and threshold, never advice.
 - Commits use the GitHub no-reply email (the repo is public).
 
 ## Commands (run from repo root)

@@ -2,6 +2,9 @@ import type { z } from 'zod';
 
 import {
   balanceSchema,
+  holdingSchema,
+  holdingsImportSchema,
+  portfolioSchema,
   netWorthImportSchema,
   netWorthAccountSchema,
   netWorthSchema,
@@ -202,3 +205,40 @@ export const fetchProjection = (
   });
   return getJson(`/networth/projection?${query.toString()}`, projectionSchema, signal);
 };
+
+// ---- Portfolio ----
+
+export type PortfolioBook = 'manual' | 'paper' | 'combined';
+
+export const fetchPortfolio = (
+  params: { book: PortfolioBook; benchmark: string; window: number },
+  signal?: AbortSignal,
+) => {
+  const query = new URLSearchParams({
+    book: params.book,
+    benchmark: params.benchmark,
+    window: String(params.window),
+  });
+  return getJson(`/portfolio?${query.toString()}`, portfolioSchema, signal);
+};
+
+export interface HoldingPayload {
+  symbol: string;
+  asset_class: string;
+  quantity: number;
+  account: string;
+  option_type: 'call' | 'put' | null;
+  strike: number | null;
+  expiration: string | null;
+  manual_price: number | null;
+  manual_price_as_of: string | null;
+}
+
+export const addHolding = (body: HoldingPayload) => postJson('/portfolio/holdings', body, holdingSchema);
+
+export const deleteHolding = (id: number) => deleteJson(`/portfolio/holdings/${String(id)}`);
+
+export const importHoldings = (content: string, replace: boolean) =>
+  postJson('/portfolio/import', { content, replace }, holdingsImportSchema);
+
+export const holdingsExportUrl = '/api/portfolio/export';

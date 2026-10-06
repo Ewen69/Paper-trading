@@ -59,7 +59,7 @@ def test_fresh_start(
     assert "keys are not set" in str(scout["report"])
     assert quant["status"] == "idle"
     locked = [a for a in game.agents if a.status == "locked"]
-    assert [a.id for a in locked] == ["analyst", "lead"]
+    assert [a.id for a in locked] == ["lead"]
     risk, trader = agent(game, "risk"), agent(game, "trader")
     assert (risk["status"], risk["station"]) == ("ok", "city")
     assert "Kill switch off." in str(risk["report"])

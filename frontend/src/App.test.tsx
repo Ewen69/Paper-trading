@@ -52,8 +52,8 @@ describe('HQ', () => {
       'href',
       '#data-health',
     );
-    const risk = screen.getByRole('article', { name: 'Analyst (locked)' });
-    expect(within(risk).getByText(/Unlocks in Phase 5/)).toBeInTheDocument();
+    const risk = screen.getByRole('article', { name: 'Lead Reviewer (locked)' });
+    expect(within(risk).getByText(/Unlocks in AI agents phase/)).toBeInTheDocument();
     expect(within(risk).queryByRole('link')).toBeNull();
   });
 });

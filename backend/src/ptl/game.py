@@ -32,6 +32,8 @@ from ptl.networth import compute as nw_compute
 from ptl.networth import store as nw_store
 from ptl.paper import store as paper_store
 from ptl.paper.store import PaperEvidence
+from ptl.portfolio import holdings as pf_holdings
+from ptl.portfolio import service as pf_service
 from ptl.risk import store as risk_store
 
 AgentStatus = Literal["ok", "warning", "error", "idle", "locked"]
@@ -144,7 +146,6 @@ class _Locked:
 
 
 LOCKED_AGENTS: tuple[_Locked, ...] = (
-    _Locked("analyst", "Analyst", "Portfolio allocation, risk and Greeks", "Phase 5"),
     _Locked(
         "lead",
         "Lead Reviewer",
@@ -624,6 +625,64 @@ def _accountant(conn: sqlite3.Connection, stale_after_days: int, now: datetime) 
     )
 
 
+PORTFOLIO_SOURCE = "Holdings (local SQLite) and imported prices"
+
+
+def _analyst(conn: sqlite3.Connection, now: datetime) -> AgentOut:
+    """Counts only; values, weights and tips live on the Portfolio station."""
+    held = pf_holdings.holdings(conn)
+    if not held:
+        lines = [
+            ReportLine(
+                text="No holdings yet. Add them on the Portfolio station or import a CSV.",
+                source=PORTFOLIO_SOURCE,
+                as_of=now,
+            )
+        ]
+        status: AgentStatus = "idle"
+    else:
+        unpriced = [
+            h.symbol
+            for h in held
+            if (h.asset_class == "option" and pf_service.latest_quote(conn, h) is None)
+            or (
+                h.asset_class not in ("option", "cash")
+                and pf_service.latest_bar(conn, h.symbol) is None
+                and h.manual_price is None
+            )
+        ]
+        accounts = {h.account for h in held}
+        lines = [
+            ReportLine(
+                text=f"{len(held)} holding(s) across {len(accounts)} account label(s).",
+                source=PORTFOLIO_SOURCE,
+                as_of=now,
+            )
+        ]
+        if unpriced:
+            lines.append(
+                ReportLine(
+                    text=f"No price source for {len(unpriced)}: "
+                    f"{', '.join(sorted(set(unpriced))[:5])}. "
+                    "Import bars or quotes, or enter a manual price.",
+                    source=PORTFOLIO_SOURCE,
+                    as_of=now,
+                )
+            )
+        status = "warning" if unpriced else "ok"
+    return AgentOut(
+        id="analyst",
+        name="Analyst",
+        role="Portfolio allocation, concentration, risk, Greeks and rule-based tips",
+        station="portfolio",
+        status=status,
+        unlocks_in=None,
+        xp=0,
+        level=1,
+        report=lines,
+    )
+
+
 def compute_game_state(
     conn: sqlite3.Connection,
     health: DataHealthOut,
@@ -652,6 +711,7 @@ def compute_game_state(
         _risk_officer(conn, now),
         _paper_trader(conn, paper, now),
         _accountant(conn, stale_after_days, now),
+        _analyst(conn, now),
         *(
             AgentOut(
                 id=a.id,
