@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchGameState } from '../api/client';
 import type { Agent, GameEvent, GameState } from '../api/schemas';
 import { useApi, type ApiState } from '../api/useApi';
+import { CityPage } from '../city/CityPage';
 import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
 import { ACTIVITY_EVENT, announceActivity } from './activity';
@@ -13,15 +14,16 @@ import { timeOf } from './status';
 import { StatusChip } from './StatusChip';
 
 const STATIONS = [
-  { id: 'hq', key: '1', label: 'HQ', agent: null },
-  { id: 'data-health', key: '2', label: 'Data Scout', agent: 'scout' },
-  { id: 'strategy-lab', key: '3', label: 'Quant', agent: 'quant' },
-  { id: 'audit', key: '4', label: 'Auditor', agent: 'auditor' },
+  { id: 'city', key: '1', label: 'City', agent: null, icon: '🏙' },
+  { id: 'hq', key: '2', label: 'HQ', agent: null, icon: '🏠' },
+  { id: 'data-health', key: '3', label: 'Data Scout', agent: 'scout', icon: null },
+  { id: 'strategy-lab', key: '4', label: 'Quant', agent: 'quant', icon: null },
+  { id: 'audit', key: '5', label: 'Auditor', agent: 'auditor', icon: null },
 ] as const;
 type StationId = (typeof STATIONS)[number]['id'];
 
 const stationFromHash = (): StationId =>
-  STATIONS.find((s) => `#${s.id}` === window.location.hash)?.id ?? 'hq';
+  STATIONS.find((s) => `#${s.id}` === window.location.hash)?.id ?? 'city';
 
 const eventKey = (e: GameEvent) => `${e.at.toISOString()}|${e.kind}|${e.text}`;
 
@@ -97,7 +99,7 @@ function Hotbar({ current, agents }: { current: StationId; agents: Agent[] }) {
             {s.agent ? (
               <AgentSprite agentId={s.agent} size={20} animate={false} />
             ) : (
-              <span aria-hidden="true">🏠</span>
+              <span aria-hidden="true">{s.icon}</span>
             )}
             <span
               className={`font-pixel text-[9px] uppercase ${active ? 'text-sky-300' : 'text-slate-300'}`}
@@ -195,7 +197,7 @@ export function GameShell() {
     };
   }, [reload]);
 
-  // Hotkeys 1-3 switch stations, except while typing in a form field.
+  // Hotkeys 1-5 switch stations, except while typing in a form field.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -237,7 +239,8 @@ export function GameShell() {
       <Hotbar current={station} agents={agents} />
       <main>
         {station === 'hq' && <HQPage game={game} />}
-        {station !== 'hq' && <StationHeader agent={stationAgent} />}
+        {station === 'city' && <CityPage />}
+        {station !== 'hq' && station !== 'city' && <StationHeader agent={stationAgent} />}
         {station === 'data-health' && <DataHealthPage />}
         {station === 'strategy-lab' && <StrategyLabPage onActivity={announceActivity} />}
         {station === 'audit' && <AuditPage game={game} />}

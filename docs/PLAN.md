@@ -75,7 +75,7 @@ reviewer. Rules for this:
 - Net-worth data never goes to a cloud model unless the user explicitly opts in.
 - API keys live in `.env`.
 
-**Phase 3 — Strategy interface & paper runner.** Strategy plugin protocol + registry.
+**Phase 3 — Strategy interface & paper runner.** *(Done: see `docs/AGENTS.md`. Also adds the live agent runtime and the City view. Options paper trading is deferred.)* Strategy plugin protocol + registry.
 Risk module (max loss/trade, max loss/day, max open positions, max capital at risk, kill switch,
 defined-risk-only validator that rejects naked short options). Paper runner using
 `alpaca-py` `TradingClient(paper=True)` with a second paper-URL assertion; audit log of every

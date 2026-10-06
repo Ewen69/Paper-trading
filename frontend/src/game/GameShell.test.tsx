@@ -16,7 +16,7 @@ const routes = {
 
 describe('GameShell', () => {
   beforeEach(() => {
-    window.location.hash = '';
+    window.location.hash = '#hq';
   });
 
   it('shows level and process XP with its source in the HUD', async () => {
@@ -35,12 +35,12 @@ describe('GameShell', () => {
     render(<GameShell />);
     await screen.findByText('LV 2');
     act(() => {
-      fireEvent.keyDown(window, { key: '3' });
+      fireEvent.keyDown(window, { key: '4' });
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
     expect(window.location.hash).toBe('#strategy-lab');
     const capital = await screen.findByLabelText('Starting capital ($)');
-    fireEvent.keyDown(capital, { key: '2' });
+    fireEvent.keyDown(capital, { key: '3' });
     expect(window.location.hash).toBe('#strategy-lab');
   });
 

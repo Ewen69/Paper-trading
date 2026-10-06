@@ -59,7 +59,12 @@ def test_fresh_start(
     assert "keys are not set" in str(scout["report"])
     assert quant["status"] == "idle"
     locked = [a for a in game.agents if a.status == "locked"]
-    assert [a.id for a in locked] == ["risk", "trader", "accountant", "analyst", "lead"]
+    assert [a.id for a in locked] == ["accountant", "analyst", "lead"]
+    risk, trader = agent(game, "risk"), agent(game, "trader")
+    assert (risk["status"], risk["station"]) == ("ok", "city")
+    assert "Kill switch off." in str(risk["report"])
+    assert trader["status"] == "idle"
+    assert "Dry run is the default" in str(trader["report"])
     assert all(a.unlocks_in and a.report == [] and a.station is None for a in locked)
     assert "never earn XP" in game.xp_policy
 

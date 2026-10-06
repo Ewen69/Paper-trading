@@ -70,7 +70,7 @@ export const gameStatePayload = {
         ),
       ],
     },
-    lockedAgent('risk', 'Risk Officer', 'Phase 3'),
+    lockedAgent('accountant', 'Accountant', 'Phase 4'),
     lockedAgent('lead', 'Lead Reviewer', 'AI agents phase'),
   ],
   events: [
@@ -152,9 +152,9 @@ export const gameStatePayload = {
         title: '200+ paper trades',
         requirement: 'At least 200 filled paper trades, all logged.',
         status: 'not_started',
-        progress: '0 of 200 trades. Paper trading arrives in Phase 3.',
+        progress: '0 of 200 trades.',
         evidence: null,
-        source: 'Paper trading log (built in Phase 3; no paper trading has happened yet)',
+        source: 'Paper trading log: Alpaca paper-account fills only; dry runs never count (local SQLite)',
         as_of: AS_OF,
       },
       {

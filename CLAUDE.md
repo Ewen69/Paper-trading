@@ -50,14 +50,25 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   - XP rewards process, never returns, wins or profit. No streaks or leaderboards.
   - Agents for unbuilt modules stay locked. A new module's agent unlocks in the phase that
     builds it.
+- Live agents (`ptl/agents`, frontend `src/city`):
+  - Sweeps run in-sample only, and every combination is a counted run.
+  - Only an explicit `promote` may spend the single out-of-sample test on the finalist.
+  - Autopilot never promotes.
+  - Live status goes over `/ws/activity`. The City's 3D view is decoration; DOM panels carry
+    all data.
+- Risk and paper (`ptl/risk`, `ptl/paper`):
+  - Risk limits are code (`risk/engine.py`). Every order passes `evaluate` and is logged.
+  - Dry run is the default.
+  - `AlpacaPaperBroker` re-asserts the paper URL before each submit.
+  - Log tables are append-only (DB triggers).
 - Commits use the GitHub no-reply email (the repo is public).
 
 ## Commands (run from repo root)
 
 - `npm install` — first-time setup (installs root tools, runs `uv sync` and frontend install).
 - `npm run dev` — start backend (:8000) and frontend (:5173) together.
-- `npm run ptl -- <command>` — data CLI (`import-csv`, `datasets`, `delete-dataset`); see
-  `docs/DATA.md`.
+- `npm run ptl -- <command>` — CLI (`import-csv`, `datasets`, `delete-dataset`, `paper-cycle`,
+  `kill-switch`); see `docs/DATA.md` and `docs/AGENTS.md`.
 - `npm run check` — ruff, ruff format check, mypy, pytest, ESLint, tsc, Vitest. Must be clean
   (zero warnings) before any commit.
 

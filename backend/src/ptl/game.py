@@ -28,6 +28,9 @@ from ptl.data_api import DataHealthOut, compute_data_health
 from ptl.db import open_db
 from ptl.graduation import GraduationOut, compute_graduation
 from ptl.market_calendar import MarketCalendar
+from ptl.paper import store as paper_store
+from ptl.paper.store import PaperEvidence
+from ptl.risk import store as risk_store
 
 AgentStatus = Literal["ok", "warning", "error", "idle", "locked"]
 
@@ -139,8 +142,6 @@ class _Locked:
 
 
 LOCKED_AGENTS: tuple[_Locked, ...] = (
-    _Locked("risk", "Risk Officer", "Enforces loss limits and the kill switch", "Phase 3"),
-    _Locked("trader", "Paper Trader", "Places orders on the Alpaca paper account", "Phase 3"),
     _Locked("accountant", "Accountant", "Tracks net worth from your manual entries", "Phase 4"),
     _Locked("analyst", "Analyst", "Portfolio allocation, risk and Greeks", "Phase 5"),
     _Locked(
@@ -496,6 +497,80 @@ def _auditor(flags: Sequence[Flag], has_material: bool, now: datetime) -> AgentO
     )
 
 
+RISK_SOURCE = "Risk state and decision log (local SQLite)"
+PAPER_LOG_SOURCE = "Paper trading log (local SQLite)"
+
+
+def _risk_officer(conn: sqlite3.Connection, now: datetime) -> AgentOut:
+    switch = risk_store.kill_switch(conn)
+    if switch.engaged:
+        lines = [
+            ReportLine(
+                text=f"Kill switch ENGAGED: {switch.reason}. No new risk can be opened.",
+                source=RISK_SOURCE,
+                as_of=switch.changed_at or now,
+            )
+        ]
+    else:
+        lines = [ReportLine(text="Kill switch off.", source=RISK_SOURCE, as_of=now)]
+    for d in risk_store.recent_decisions(conn, 2):
+        verdict = "approved" if d.approved else "rejected"
+        lines.append(
+            ReportLine(text=f"{verdict}: {d.order_text}", source=d.source, as_of=d.created_at)
+        )
+    return AgentOut(
+        id="risk",
+        name="Risk Officer",
+        role="Enforces loss limits and the kill switch on every paper order",
+        station="city",
+        status="warning" if switch.engaged else "ok",
+        unlocks_in=None,
+        xp=0,
+        level=1,
+        report=lines,
+    )
+
+
+def _paper_trader(conn: sqlite3.Connection, paper: PaperEvidence, now: datetime) -> AgentOut:
+    cycles = paper_store.recent_cycles(conn, 1)
+    if not cycles:
+        lines = [
+            ReportLine(
+                text="No paper cycles yet. Dry run is the default.",
+                source=PAPER_LOG_SOURCE,
+                as_of=now,
+            )
+        ]
+        status: AgentStatus = "idle"
+    else:
+        c = cycles[0]
+        lines = [
+            ReportLine(
+                text=f"{c.mode} cycle on {c.symbol} ({c.strategy}): {c.outcome}",
+                source=PAPER_LOG_SOURCE,
+                as_of=c.created_at,
+            ),
+            ReportLine(
+                text=f"{paper.filled_trades} filled paper-account trade(s) logged; "
+                "dry runs never count.",
+                source=PAPER_LOG_SOURCE,
+                as_of=paper.last_fill or c.created_at,
+            ),
+        ]
+        status = "ok"
+    return AgentOut(
+        id="trader",
+        name="Paper Trader",
+        role="Runs paper cycles on the Alpaca paper account (dry run by default)",
+        station="city",
+        status=status,
+        unlocks_in=None,
+        xp=0,
+        level=1,
+        report=lines,
+    )
+
+
 def compute_game_state(
     conn: sqlite3.Connection, health: DataHealthOut, now: datetime
 ) -> GameStateOut:
@@ -503,6 +578,7 @@ def compute_game_state(
     clean_ids = {d.id for d in datasets if not data_repo.issues_for(conn, d.id)}
     locks = bt_repo.list_locks(conn)
     runs = bt_repo.all_runs(conn)
+    paper = paper_store.paper_evidence(conn)
     flags = compute_flags(health, runs, bt_repo.warnings_by_run(conn))
 
     events = _events(datasets, locks, runs)
@@ -516,6 +592,8 @@ def compute_game_state(
         _scout(health, xp_by_agent["scout"]),
         _quant(runs, now, xp_by_agent["quant"]),
         _auditor(flags, bool(datasets or runs), now),
+        _risk_officer(conn, now),
+        _paper_trader(conn, paper, now),
         *(
             AgentOut(
                 id=a.id,
@@ -549,7 +627,7 @@ def compute_game_state(
         xp_rules=[XpRuleOut(id=r.id, description=r.description, xp=r.xp) for r in XP_RULES],
         xp_policy=XP_POLICY,
         flags=flags,
-        graduation=compute_graduation(runs, now),
+        graduation=compute_graduation(runs, paper, now),
     )
 
 

@@ -9,7 +9,7 @@ import { gameStatePayload } from './test/gameFixtures';
 
 describe('HQ', () => {
   beforeEach(() => {
-    window.location.hash = '';
+    window.location.hash = '#hq';
   });
 
   it('shows backend health with source and timestamp', async () => {
@@ -52,8 +52,8 @@ describe('HQ', () => {
       'href',
       '#data-health',
     );
-    const risk = screen.getByRole('article', { name: 'Risk Officer (locked)' });
-    expect(within(risk).getByText(/Unlocks in Phase 3/)).toBeInTheDocument();
+    const risk = screen.getByRole('article', { name: 'Accountant (locked)' });
+    expect(within(risk).getByText(/Unlocks in Phase 4/)).toBeInTheDocument();
     expect(within(risk).queryByRole('link')).toBeNull();
   });
 });

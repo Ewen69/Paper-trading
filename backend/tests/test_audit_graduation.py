@@ -2,7 +2,7 @@
 
 import sqlite3
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -15,6 +15,7 @@ from ptl.db import connect, migrate
 from ptl.game import GameStateOut, compute_game_state
 from ptl.graduation import GATE_NOTE, GateItem, compute_graduation
 from ptl.market_calendar import MarketCalendar
+from ptl.paper.store import PaperEvidence
 from tests.conftest import SettingsFactory
 from tests.test_backtest_service import NOW, load, request, trend, wave
 from tests.test_data_api import FakeSource
@@ -131,8 +132,11 @@ def _run(run_id: int, symbol: str, period: Period, ci: tuple[float, float] | Non
     )
 
 
+NO_PAPER = PaperEvidence(0, None, None, 0, 0)
+
+
 def _edge(runs: list[RunRecord]) -> GateItem:
-    return next(i for i in compute_graduation(runs, NOW).items if i.id == "oos_edge")
+    return next(i for i in compute_graduation(runs, NO_PAPER, NOW).items if i.id == "oos_edge")
 
 
 def test_gate_judges_only_the_first_out_of_sample_look() -> None:
@@ -183,3 +187,25 @@ def test_gate_met_on_a_clean_first_look(
     assert item.evidence is not None
     assert "95% CI" in item.evidence
     assert gate.met == 1
+
+
+def _paper(evidence: PaperEvidence) -> dict[str, GateItem]:
+    return {i.id: i for i in compute_graduation([], evidence, NOW).items}
+
+
+def test_paper_items_count_only_paper_account_fills() -> None:
+    empty = _paper(NO_PAPER)
+    assert {empty[k].status for k in ("paper_days", "paper_trades", "zero_breaches")} == {
+        "not_started"
+    }
+    first, last = datetime(2026, 1, 5, tzinfo=UTC), datetime(2026, 4, 10, tzinfo=UTC)
+    items = _paper(PaperEvidence(12, first, last, 0, 30))
+    assert (items["paper_days"].status, items["paper_days"].progress) == ("met", "95 of 90 days.")
+    assert (items["paper_trades"].status, items["paper_trades"].progress) == (
+        "not_met",
+        "12 of 200 trades.",
+    )
+    assert items["zero_breaches"].status == "met"
+    tripped = _paper(PaperEvidence(12, first, last, 1, 30))["zero_breaches"]
+    assert tripped.status == "not_met"
+    assert "1 kill-switch trip" in tripped.progress

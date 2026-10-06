@@ -237,11 +237,14 @@ def test_sync_records_fills_and_logs_are_append_only(
 ) -> None:
     broker = FakeBroker()
     cycle(conn, generous(settings), broker, Quotes(600.0))
+    assert store.paper_evidence(conn).filled_trades == 0  # submitted is not filled
     broker.status = "filled"
     assert sync_orders(conn, broker, NOW) == 1
     assert sync_orders(conn, broker, NOW) == 0  # final: not polled again
     [order] = store.recent_orders(conn, 1)
     assert store.latest_status(conn, order.id) == "filled"
+    evidence = store.paper_evidence(conn)
+    assert (evidence.filled_trades, evidence.decisions, evidence.kill_switch_trips) == (1, 1, 0)
     for table in ("paper_cycles", "paper_orders", "paper_order_events", "risk_decisions"):
         with pytest.raises(sqlite3.DatabaseError, match="append-only"):
             conn.execute(f"DELETE FROM {table}")  # noqa: S608 - fixed table names

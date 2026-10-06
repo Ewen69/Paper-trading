@@ -5,7 +5,7 @@ Paper Trading Lab uses two kinds of data. Each one is stored and shown with its 
 
 | Kind | Where it comes from | Used for |
 |---|---|---|
-| Live quotes | Alpaca market data (needs paper API keys in `.env`) | Data Health checks now; the paper runner in Phase 3 |
+| Live quotes | Alpaca market data (needs paper API keys in `.env`) | Data Health checks; paper-runner sizing (paper mode requires a live quote) |
 | Historical data | CSV files you import | Backtesting (Phase 2) |
 
 ## Live quotes (Alpaca)

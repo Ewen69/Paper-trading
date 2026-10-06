@@ -279,3 +279,39 @@ def last_session_for_runner(conn: sqlite3.Connection, runner_id: int) -> date | 
         "SELECT MAX(session) AS s FROM paper_cycles WHERE runner_id = ?", (runner_id,)
     ).fetchone()
     return date.fromisoformat(row["s"]) if row and row["s"] else None
+
+
+@dataclass(frozen=True, slots=True)
+class PaperEvidence:
+    """What the paper log proves so far. Dry-run orders never count; only paper-account fills."""
+
+    filled_trades: int
+    first_fill: datetime | None
+    last_fill: datetime | None
+    kill_switch_trips: int
+    decisions: int
+
+
+def paper_evidence(conn: sqlite3.Connection) -> PaperEvidence:
+    fills = conn.execute(
+        """
+        SELECT COUNT(*) AS n, MIN(e.at) AS first, MAX(e.at) AS last
+        FROM paper_orders o
+        JOIN paper_order_events e ON e.order_id = o.id
+        WHERE o.mode = 'paper' AND e.status = 'filled'
+          AND e.id = (SELECT MAX(id) FROM paper_order_events WHERE order_id = o.id)
+        """
+    ).fetchone()
+    risk = conn.execute(
+        """
+        SELECT COUNT(*) AS n, COALESCE(SUM(tripped), 0) AS trips
+        FROM risk_decisions WHERE source = 'paper runner (paper)'
+        """
+    ).fetchone()
+    return PaperEvidence(
+        filled_trades=int(fills["n"]),
+        first_fill=datetime.fromisoformat(fills["first"]) if fills["first"] else None,
+        last_fill=datetime.fromisoformat(fills["last"]) if fills["last"] else None,
+        kill_switch_trips=int(risk["trips"]),
+        decisions=int(risk["n"]),
+    )
