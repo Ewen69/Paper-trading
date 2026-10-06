@@ -104,6 +104,7 @@ export type Estimate = z.infer<typeof estimateSchema>;
 
 export const strategySchema = z.object({
   id: z.string(),
+  asset: z.enum(['equity', 'options']),
   name: z.string(),
   description: z.string(),
   params: z.array(
@@ -185,11 +186,7 @@ export const realityCheckSchema = z.object({
   oos_start: isoDate,
   oos_locked_at: isoDateTime,
   oos_lock_basis: z.string(),
-  costs: z.object({
-    slippage_bps: z.number(),
-    commission_per_order: z.number(),
-    commission_bps: z.number(),
-  }),
+  cost_lines: z.array(z.object({ label: z.string(), value: z.string() })),
   initial_capital: z.number(),
   price_basis: z.enum(['adjusted', 'raw']),
   benchmark_price_basis: z.enum(['adjusted', 'raw']),
@@ -327,3 +324,89 @@ export const gameStateSchema = z.object({
 export type GameState = z.infer<typeof gameStateSchema>;
 export type Flag = GameState['flags'][number];
 export type Graduation = GameState['graduation'];
+
+// ---- Options backtesting ----
+
+export const optionsUniverseSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  entries: z.array(
+    z.object({
+      dataset_id: z.number().int(),
+      underlying: z.string(),
+      source: z.string(),
+      file_name: z.string(),
+      first_date: isoDate,
+      last_date: isoDate,
+      quote_days: z.number().int(),
+      rows: z.number().int(),
+      rows_missing_style: z.number().int(),
+      lock: lockSchema.nullable(),
+      underlying_datasets: z.array(
+        z.object({
+          dataset_id: z.number().int(),
+          first_date: isoDate,
+          last_date: isoDate,
+          sessions: z.number().int(),
+        }),
+      ),
+    }),
+  ),
+});
+export type OptionsUniverse = z.infer<typeof optionsUniverseSchema>;
+export type OptionsUniverseEntry = OptionsUniverse['entries'][number];
+
+export const optionsReportSchema = reportSchema
+  .omit({ trades: true, benchmark_provenance: true })
+  .extend({
+    trades: z.array(
+      z.object({
+        position_id: z.number().int(),
+        opened: isoDate,
+        closed: isoDate,
+        description: z.string(),
+        structure: z.string(),
+        contracts: z.number().int(),
+        entry_premium: z.number(),
+        max_loss: z.number(),
+        pnl: z.number(),
+        exit_kind: z.string(),
+        sessions_held: z.number().int(),
+      }),
+    ),
+    events: z.array(
+      z.object({
+        day: isoDate,
+        kind: z.string(),
+        position_id: z.number().int().nullable(),
+        text: z.string(),
+        cash: z.number(),
+      }),
+    ),
+    counts: z.object({
+      rejected_orders: z.number().int(),
+      stale_marks: z.number().int(),
+      pin_events: z.number().int(),
+      early_assignments: z.number().int(),
+      margin_shortfalls: z.number().int(),
+      peak_collateral: z.number(),
+    }),
+    underlying_provenance: provenanceSchema,
+    benchmark_provenance: provenanceSchema,
+  });
+export type OptionsReport = z.infer<typeof optionsReportSchema>;
+
+/** The fields every results screen shares (equity or options). */
+export type ResultCore = Pick<
+  Report,
+  | 'run_id'
+  | 'symbol'
+  | 'benchmark_symbol'
+  | 'strategy'
+  | 'strategy_metrics'
+  | 'benchmark_metrics'
+  | 'excess_annualized_return'
+  | 'curve'
+  | 'reality_check'
+  | 'provenance'
+>;

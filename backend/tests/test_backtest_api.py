@@ -28,7 +28,8 @@ def client(make_settings: SettingsFactory, tmp_path: Path, calendar: MarketCalen
 def test_strategies_endpoint(client: TestClient) -> None:
     body = client.get("/backtest/strategies").json()
     ids = [s["id"] for s in body]
-    assert ids == ["buy_and_hold", "sma_crossover"]
+    assert ids == ["buy_and_hold", "sma_crossover", "put_credit_spread"]
+    assert [s["asset"] for s in body] == ["equity", "equity", "options"]
     fast = body[1]["params"][0]
     assert (fast["name"], fast["default"], fast["minimum"]) == ("fast", 50, 2)
 
@@ -70,7 +71,11 @@ def test_run_returns_report_with_reality_check(client: TestClient) -> None:
     assert body["symbol"] == "QQQ"
     assert body["strategy"]["params"] == {"fast": 5, "slow": 20}
     rc = body["reality_check"]
-    assert rc["costs"] == {"slippage_bps": 2.0, "commission_per_order": 1.0, "commission_bps": 0.0}
+    assert [line["value"] for line in rc["cost_lines"]] == [
+        "2 bps per side",
+        "$1.00",
+        "0 bps of notional",
+    ]
     assert rc["parameter_combinations_tried"] == 1
     assert rc["sessions"] == 210
     assert body["provenance"]["data_type"] == "end-of-day"

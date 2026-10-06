@@ -32,6 +32,13 @@ RUN_WARNING_FLAGS: dict[str, tuple[FlagSeverity, str]] = {
     "data_quality": ("warning", "Data issues inside a backtest window"),
     "ci_includes_zero": ("info", "No clear edge"),
     "warmup_cash": ("info", "Warm-up spent in cash"),
+    # Options backtests
+    "pin_risk": ("warning", "Pin risk realized"),
+    "assignment_margin": ("warning", "Assignment beyond available cash"),
+    "rejected_fills": ("warning", "Orders not filled"),
+    "stale_marks": ("warning", "Stale option marks"),
+    "quote_quality": ("warning", "Bad option quotes in window"),
+    "early_assignment": ("info", "Early assignment"),
 }
 
 

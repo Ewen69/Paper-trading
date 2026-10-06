@@ -122,6 +122,10 @@ MIGRATIONS: tuple[str, ...] = (
     CREATE TRIGGER run_warnings_no_delete BEFORE DELETE ON run_warnings
     BEGIN SELECT RAISE(ABORT, 'run warnings are append-only'); END;
     """,
+    # 4: per-session chain lookups for the options engine.
+    """
+    CREATE INDEX option_quotes_by_day ON option_quotes (dataset_id, underlying, quote_date);
+    """,
 )
 
 

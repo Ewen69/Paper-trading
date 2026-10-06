@@ -11,11 +11,12 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
 
-from ptl.backtest.models import EngineResult, EquityPoint
+from ptl.backtest.models import EquityPoint
 
 TRADING_DAYS = 252
 CONFIDENCE = 0.95
@@ -26,6 +27,24 @@ MIN_TRADES_FOR_CI = 5
 _CHUNK = 250
 
 FloatArray = npt.NDArray[np.float64]
+
+
+class _HasPnl(Protocol):
+    @property
+    def pnl(self) -> float: ...
+
+
+class BacktestOutcome(Protocol):
+    """What metrics need from any engine (equities or options)."""
+
+    @property
+    def initial_capital(self) -> float: ...
+    @property
+    def equity(self) -> Sequence[EquityPoint]: ...
+    @property
+    def trades(self) -> Sequence[_HasPnl]: ...
+    @property
+    def total_costs(self) -> float: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +189,7 @@ def _trade_bootstrap(pnls: FloatArray) -> tuple[Interval | None, Interval | None
 
 
 def performance(
-    result: EngineResult,
+    result: BacktestOutcome,
     annualized_ci: Interval | None = None,
     sharpe_ci: Interval | None = None,
 ) -> Performance:

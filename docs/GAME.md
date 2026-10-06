@@ -45,6 +45,9 @@ together with data findings, into standing flags.
 | Data issues inside a backtest window | warning | `data_quality` |
 | No clear edge | info | `ci_includes_zero` (excess-return CI includes 0) |
 | Warm-up spent in cash | info | `warmup_cash` |
+| Pin risk realized / Assignment beyond available cash | warning | options: `pin_risk` / `assignment_margin` |
+| Orders not filled / Stale option marks / Bad option quotes | warning | options: `rejected_fills` / `stale_marks` / `quote_quality` |
+| Early assignment | info | options: `early_assignment` |
 | Dataset not current | info | dataset staleness |
 | Live quotes off | info | no paper keys in `.env` |
 

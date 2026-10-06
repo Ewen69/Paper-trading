@@ -1,15 +1,17 @@
-import { useId, useState, type SyntheticEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 
 import { fetchStrategies, fetchUniverse, runBacktest } from '../api/client';
 import type { Period, Report, Strategy, UniverseEntry } from '../api/schemas';
 import { useApi } from '../api/useApi';
 import { Card, NoData } from '../components/Card';
 import { EquityChart } from '../components/EquityChart';
+import { inputClass, NumberField } from '../components/fields';
 import { MetricsTable } from '../components/MetricsTable';
 import { Provenance } from '../components/Provenance';
 import { RealityCheckPanel } from '../components/RealityCheckPanel';
 import { AgentSprite } from '../game/AgentSprite';
 import { pct, usd } from '../format';
+import { OptionsLab } from './OptionsLab';
 
 type RunState =
   | { kind: 'idle' }
@@ -21,45 +23,6 @@ const keyOf = (e: UniverseEntry) => `${String(e.dataset_id)}:${e.symbol}`;
 const defaults = (s: Strategy | undefined) =>
   Object.fromEntries((s?.params ?? []).map((p) => [p.name, p.default]));
 
-const inputClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100';
-
-function NumberField(props: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  min?: number;
-  max?: number;
-  step?: number | 'any';
-  hint?: string;
-}) {
-  const id = useId();
-  return (
-    <div className="text-sm">
-      <label htmlFor={id} className="mb-1 block text-slate-400">
-        {props.label}
-      </label>
-      <input
-        id={id}
-        type="number"
-        className={inputClass}
-        value={props.value}
-        min={props.min}
-        max={props.max}
-        step={props.step ?? 1}
-        aria-describedby={props.hint ? `${id}-hint` : undefined}
-        onChange={(e) => {
-          props.onChange(Number(e.target.value));
-        }}
-      />
-      {props.hint && (
-        <span id={`${id}-hint`} className="mt-1 block text-xs text-slate-500">
-          {props.hint}
-        </span>
-      )}
-    </div>
-  );
-}
 
 function LabForm({
   universe,
@@ -357,6 +320,11 @@ function Results({ report }: { report: Report }) {
 export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
   const [universe, reloadUniverse] = useApi(fetchUniverse);
   const [strategies] = useApi(fetchStrategies);
+  const [asset, setAsset] = useState<'equity' | 'options'>('equity');
+  const done = () => {
+    reloadUniverse();
+    onActivity?.();
+  };
 
   if (universe.kind === 'loading' || strategies.kind === 'loading') {
     return <p className="text-slate-400">Loading…</p>;
@@ -369,13 +337,37 @@ export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
       </Card>
     );
   }
+  const modes = [
+    { id: 'equity', label: 'Stocks & ETFs' },
+    { id: 'options', label: 'Options' },
+  ] as const;
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-pixel text-xs uppercase text-slate-100">Strategy Lab</h2>
-        <Provenance source={universe.data.source} asOf={universe.data.as_of} asOfLabel="loaded" />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-pixel text-xs uppercase text-slate-100">Strategy Lab</h2>
+          <Provenance source={universe.data.source} asOf={universe.data.as_of} asOfLabel="loaded" />
+        </div>
+        <div role="tablist" aria-label="Asset type" className="flex gap-1">
+          {modes.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={asset === m.id}
+              onClick={() => {
+                setAsset(m.id);
+              }}
+              className={`btn-pixel px-3 py-2 ${asset === m.id ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
-      {universe.data.entries.length === 0 ? (
+      {asset === 'options' ? (
+        <OptionsLab strategies={strategies.data.filter((s) => s.asset === 'options')} onDone={done} />
+      ) : universe.data.entries.length === 0 ? (
         <Card title="No data">
           <NoData
             message={
@@ -388,11 +380,8 @@ export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
       ) : (
         <LabForm
           universe={universe.data.entries}
-          strategies={strategies.data}
-          onDone={() => {
-            reloadUniverse();
-            onActivity?.();
-          }}
+          strategies={strategies.data.filter((s) => s.asset === 'equity')}
+          onDone={done}
         />
       )}
     </div>

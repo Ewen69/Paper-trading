@@ -71,7 +71,7 @@ smooths or drops rows. In Phase 2 the backtester must refuse to fill against err
 | `option_type` | yes | `call`/`put` or `C`/`P` |
 | `bid`, `ask` | yes | The backtester fills at these, never at mid or last. |
 | `root` | no | Option root when it differs from the underlying (e.g. `SPXW`). |
-| `exercise_style` | no | `american` or `european`. Phase 2b needs this for early-exercise handling and won't assume it. |
+| `exercise_style` | no (import) / **yes for options backtests** | `american` (physical delivery, can be assigned early) or `european` (cash-settled). Options backtests refuse quotes without it; see [OPTIONS.md](OPTIONS.md). |
 | `bid_size`, `ask_size`, `volume`, `open_interest` | no | Whole numbers. |
 | `last`, `underlying_price`, `implied_volatility`, `delta`, `gamma`, `theta`, `vega` | no | Stored as the vendor provided them. |
 

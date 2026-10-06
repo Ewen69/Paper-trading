@@ -1,4 +1,4 @@
-import type { Estimate, Performance, Report } from '../api/schemas';
+import type { Estimate, Performance, ResultCore } from '../api/schemas';
 import { num, pct, range, usd } from '../format';
 
 interface Row {
@@ -42,7 +42,7 @@ const ROWS: Row[] = [
   { label: 'Costs paid', value: (p) => usd(p.total_costs) },
 ];
 
-export function MetricsTable({ report }: { report: Report }) {
+export function MetricsTable({ report }: { report: ResultCore }) {
   const columns: [string, Performance][] = [
     [`${report.strategy.name} · ${report.symbol}`, report.strategy_metrics],
     [`Buy & hold · ${report.benchmark_symbol}`, report.benchmark_metrics],

@@ -269,7 +269,7 @@ def test_report_compares_with_benchmark_after_costs(
     rc = report.reality_check
     assert rc.bootstrap.seed == 20251005
     assert rc.bootstrap.resamples == 2000
-    assert rc.costs.slippage_bps == 5.0
+    assert rc.cost_lines[0].value == "5 bps per side"
     assert any("needs 20 sessions" in w.text for w in rc.warnings)
     assert report.provenance.source.startswith("Backtest on synthetic")
 

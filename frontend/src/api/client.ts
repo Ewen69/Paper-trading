@@ -3,6 +3,8 @@ import type { z } from 'zod';
 import {
   dataHealthSchema,
   gameStateSchema,
+  optionsReportSchema,
+  optionsUniverseSchema,
   healthSchema,
   quoteSchema,
   reportSchema,
@@ -84,3 +86,26 @@ export const runBacktest = (payload: RunPayload) => postJson('/backtest/runs', p
 
 export const fetchGameState = (signal?: AbortSignal) =>
   getJson('/game/state', gameStateSchema, signal);
+
+export const fetchOptionsUniverse = (signal?: AbortSignal) =>
+  getJson('/backtest/options/universe', optionsUniverseSchema, signal);
+
+export interface OptionsRunPayload {
+  options_dataset_id: number;
+  underlying_dataset_id: number;
+  symbol: string;
+  strategy: string;
+  period: Period;
+  params: Record<string, number>;
+  slippage_per_share: number;
+  slippage_spread_fraction: number;
+  commission_per_contract: number;
+  assignment_fee_per_contract: number;
+  stock_slippage_bps: number;
+  early_assignment: boolean;
+  early_assignment_extrinsic: number;
+  initial_capital: number;
+}
+
+export const runOptionsBacktest = (payload: OptionsRunPayload) =>
+  postJson('/backtest/options/runs', payload, optionsReportSchema);

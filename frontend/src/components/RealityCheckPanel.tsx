@@ -1,4 +1,4 @@
-import type { Report } from '../api/schemas';
+import type { ResultCore } from '../api/schemas';
 import { pct, range, usd } from '../format';
 import { AgentSprite } from '../game/AgentSprite';
 import { Provenance } from './Provenance';
@@ -11,7 +11,7 @@ interface Tile {
 }
 
 /** Read this first: what the numbers rest on and why to doubt them. Shown above every result. */
-export function RealityCheckPanel({ report }: { report: Report }) {
+export function RealityCheckPanel({ report }: { report: ResultCore }) {
   const rc = report.reality_check;
   const excess = report.excess_annualized_return;
   const raised = new Set(rc.warnings.map((w) => w.code));
@@ -47,13 +47,17 @@ export function RealityCheckPanel({ report }: { report: Report }) {
       codes: ['oos_repeat'],
     },
     {
-      label: 'Costs',
-      value: `${String(rc.costs.slippage_bps)} bps`,
-      sub: `slippage/side · ${usd(rc.costs.commission_per_order)}/order · ${String(rc.costs.commission_bps)} bps comm.`,
+      label: rc.cost_lines[0]?.label ?? 'Costs',
+      value: rc.cost_lines[0]?.value ?? '—',
+      sub: rc.cost_lines
+        .slice(1, 3)
+        .map((c) => `${c.label}: ${c.value}`)
+        .join(' · '),
       codes: [],
     },
   ];
   const details: [string, string][] = [
+    ...rc.cost_lines.map((c): [string, string] => [c.label, c.value]),
     ['Period', rc.period],
     ['Starting capital', usd(rc.initial_capital)],
     ['Prices', `${rc.price_basis} (benchmark: ${rc.benchmark_price_basis})`],

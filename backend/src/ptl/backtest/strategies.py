@@ -40,19 +40,26 @@ class StrategySpec:
 
     def create(self, params: Mapping[str, int]) -> tuple[Strategy, dict[str, int]]:
         """Validate params (filling defaults) and build the strategy."""
-        known = {p.name for p in self.params}
-        unknown = set(params) - known
-        if unknown:
-            raise ValueError(f"unknown parameter(s) for {self.id}: {sorted(unknown)}")
-        resolved: dict[str, int] = {}
-        for spec in self.params:
-            value = params.get(spec.name, spec.default)
-            if isinstance(value, bool) or not isinstance(value, int):
-                raise ValueError(f"{spec.name} must be a whole number")
-            if not spec.minimum <= value <= spec.maximum:
-                raise ValueError(f"{spec.name} must be between {spec.minimum} and {spec.maximum}")
-            resolved[spec.name] = value
+        resolved = resolve_params(self.id, self.params, params)
         return self.build(resolved), resolved
+
+
+def resolve_params(
+    strategy_id: str, specs: tuple[ParamSpec, ...], params: Mapping[str, int]
+) -> dict[str, int]:
+    """Check names, types and ranges; fill defaults. Shared by equity and options strategies."""
+    unknown = set(params) - {p.name for p in specs}
+    if unknown:
+        raise ValueError(f"unknown parameter(s) for {strategy_id}: {sorted(unknown)}")
+    resolved: dict[str, int] = {}
+    for spec in specs:
+        value = params.get(spec.name, spec.default)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{spec.name} must be a whole number")
+        if not spec.minimum <= value <= spec.maximum:
+            raise ValueError(f"{spec.name} must be between {spec.minimum} and {spec.maximum}")
+        resolved[spec.name] = value
+    return resolved
 
 
 class BuyAndHold:

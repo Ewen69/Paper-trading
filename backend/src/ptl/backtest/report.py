@@ -98,10 +98,9 @@ class CurvePoint(BaseModel):
     benchmark: float | None
 
 
-class CostsOut(BaseModel):
-    slippage_bps: float
-    commission_per_order: float
-    commission_bps: float
+class CostLine(BaseModel):
+    label: str
+    value: str
 
 
 class BootstrapOut(BaseModel):
@@ -132,7 +131,7 @@ class RealityCheck(BaseModel):
     oos_start: date
     oos_locked_at: AwareDatetime
     oos_lock_basis: str
-    costs: CostsOut
+    cost_lines: list[CostLine]
     initial_capital: float
     price_basis: PriceBasis
     benchmark_price_basis: PriceBasis

@@ -10,11 +10,16 @@ from ptl.backtest import repository as repo
 from ptl.backtest import service
 from ptl.backtest.models import MAX_SLIPPAGE_BPS, CostModel
 from ptl.backtest.report import BacktestReport
-from ptl.backtest.strategies import STRATEGIES
+from ptl.backtest.strategies import STRATEGIES, ParamSpec
 from ptl.config import Settings
 from ptl.data.live import Clock
 from ptl.db import open_db
 from ptl.market_calendar import MarketCalendar
+from ptl.options import service as options_service
+from ptl.options.chain import option_universe
+from ptl.options.models import OptionCosts
+from ptl.options.report import OptionsBacktestReport
+from ptl.options.strategies import OPTIONS_STRATEGIES
 
 
 class ParamOut(BaseModel):
@@ -28,6 +33,7 @@ class ParamOut(BaseModel):
 
 class StrategyOut(BaseModel):
     id: str
+    asset: Literal["equity", "options"]
     name: str
     description: str
     params: list[ParamOut]
@@ -49,6 +55,50 @@ class LockOut(BaseModel):
             locked_at=lock.locked_at,
             basis=lock.basis,
         )
+
+
+class UnderlyingDatasetOut(BaseModel):
+    dataset_id: int
+    first_date: date
+    last_date: date
+    sessions: int
+
+
+class OptionsUniverseEntryOut(BaseModel):
+    dataset_id: int
+    underlying: str
+    source: str
+    file_name: str
+    first_date: date
+    last_date: date
+    quote_days: int
+    rows: int
+    rows_missing_style: int
+    lock: LockOut | None
+    underlying_datasets: list[UnderlyingDatasetOut]
+
+
+class OptionsUniverseOut(BaseModel):
+    as_of: AwareDatetime
+    source: str
+    entries: list[OptionsUniverseEntryOut]
+
+
+class OptionsRunIn(BaseModel):
+    options_dataset_id: int
+    underlying_dataset_id: int
+    symbol: str = Field(min_length=1, max_length=20)
+    strategy: str
+    period: Literal["in-sample", "out-of-sample"]
+    params: dict[str, int] = Field(default_factory=dict)
+    slippage_per_share: float = Field(default=0.01, ge=0, le=5)
+    slippage_spread_fraction: float = Field(default=0.0, ge=0, le=1)
+    commission_per_contract: float = Field(default=0.65, ge=0, le=50)
+    assignment_fee_per_contract: float = Field(default=0.0, ge=0, le=50)
+    stock_slippage_bps: float = Field(default=5.0, ge=0, le=MAX_SLIPPAGE_BPS)
+    early_assignment: bool = True
+    early_assignment_extrinsic: float = Field(default=0.05, ge=0, le=5)
+    initial_capital: float = Field(default=100_000.0, gt=0, le=1e9)
 
 
 class UniverseEntryOut(BaseModel):
@@ -108,11 +158,17 @@ def build_backtest_router(settings: Settings, calendar: MarketCalendar, clock: C
 
     @router.get("/strategies")
     def strategies() -> list[StrategyOut]:
+        specs: list[tuple[Literal["equity", "options"], str, str, str, tuple[ParamSpec, ...]]] = [
+            ("equity", s.id, s.name, s.description, s.params) for s in STRATEGIES.values()
+        ] + [
+            ("options", s.id, s.name, s.description, s.params) for s in OPTIONS_STRATEGIES.values()
+        ]
         return [
             StrategyOut(
-                id=s.id,
-                name=s.name,
-                description=s.description,
+                id=sid,
+                asset=asset,
+                name=name,
+                description=description,
                 params=[
                     ParamOut(
                         name=p.name,
@@ -122,11 +178,78 @@ def build_backtest_router(settings: Settings, calendar: MarketCalendar, clock: C
                         maximum=p.maximum,
                         description=p.description,
                     )
-                    for p in s.params
+                    for p in params
                 ],
             )
-            for s in STRATEGIES.values()
+            for asset, sid, name, description, params in specs
         ]
+
+    @router.get("/options/universe")
+    def options_universe() -> OptionsUniverseOut:
+        with open_db(settings.database_path) as conn:
+            equity = repo.equity_universe(conn)
+            entries = []
+            for e in option_universe(conn):
+                lock = repo.get_lock(conn, e.underlying)
+                entries.append(
+                    OptionsUniverseEntryOut(
+                        dataset_id=e.dataset_id,
+                        underlying=e.underlying,
+                        source=e.source,
+                        file_name=e.file_name,
+                        first_date=e.first_date,
+                        last_date=e.last_date,
+                        quote_days=e.quote_days,
+                        rows=e.rows,
+                        rows_missing_style=e.rows_missing_style,
+                        lock=LockOut.of(lock) if lock else None,
+                        underlying_datasets=[
+                            UnderlyingDatasetOut(
+                                dataset_id=u.dataset_id,
+                                first_date=u.first_date,
+                                last_date=u.last_date,
+                                sessions=u.sessions,
+                            )
+                            for u in equity
+                            if u.symbol == e.underlying
+                        ],
+                    )
+                )
+        return OptionsUniverseOut(
+            as_of=clock(),
+            source="Imported option and equity datasets (local SQLite)",
+            entries=entries,
+        )
+
+    @router.post("/options/runs")
+    def run_options(body: OptionsRunIn) -> OptionsBacktestReport:
+        try:
+            costs = OptionCosts(
+                slippage_per_share=body.slippage_per_share,
+                slippage_spread_fraction=body.slippage_spread_fraction,
+                commission_per_contract=body.commission_per_contract,
+                assignment_fee_per_contract=body.assignment_fee_per_contract,
+                stock_slippage_bps=body.stock_slippage_bps,
+                early_assignment=body.early_assignment,
+                early_assignment_extrinsic=body.early_assignment_extrinsic,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        request = options_service.OptionsRunRequest(
+            options_dataset_id=body.options_dataset_id,
+            underlying_dataset_id=body.underlying_dataset_id,
+            symbol=body.symbol,
+            strategy_id=body.strategy,
+            period=body.period,
+            params=body.params,
+            costs=costs,
+            initial_capital=body.initial_capital,
+        )
+        with open_db(settings.database_path) as conn:
+            try:
+                return options_service.run(conn, request, calendar, clock())
+            except service.BacktestRefusedError as exc:
+                raise HTTPException(409, str(exc)) from exc
 
     @router.get("/universe")
     def universe() -> UniverseOut:

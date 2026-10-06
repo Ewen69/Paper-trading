@@ -6,11 +6,50 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 2.5 (game UI)
+## Status: Phase 2b (options backtesting)
 
-Next: options backtesting (Phase 2b). See [`docs/PLAN.md`](docs/PLAN.md).
+Next: Phase 3 (strategy interface and paper runner). See [`docs/PLAN.md`](docs/PLAN.md).
 
-### What Phase 2.5 adds
+### What Phase 2b adds
+
+Details and a worked example: [`docs/OPTIONS.md`](docs/OPTIONS.md).
+
+- **Contract math with the ×100 multiplier** on premiums, P&L, collateral, exercise and
+  assignment.
+  - Buys fill at ask + slippage, sells at bid − slippage, never mid.
+  - Commission per contract; slippage per share plus an optional share of the spread.
+- **Defined risk only:** single long options and vertical spreads. Naked shorts are rejected.
+- **Collateral:** width × 100 × contracts − credit. Orders are rejected when it exceeds
+  available cash.
+- **Expiration at the underlying's close.**
+  - Out-of-the-money legs expire worthless (OCC $0.01 rule).
+  - In-the-money legs are exercised or assigned, and spreads net cleanly.
+  - American options deliver shares; European options settle in cash.
+- **Pin risk:** a between-strike finish leaves shares, which are sold at the next open, so
+  losses can exceed the spread's "max loss". It's flagged.
+- **Early assignment** of short American legs with no time value left; the in-the-money long
+  leg is exercised alongside.
+- **Put credit spread strategy:** each open and close is logged with its exact arithmetic.
+- **Options mode in the Strategy Lab:**
+  - a pre-run reality check, then the Reality Check first on every result
+  - options counts (pin events, early assignments, rejected orders, stale marks, peak
+    collateral)
+  - positions and a full event log
+- **Same rigor rules as stocks:** out-of-sample lock, trial counting, stored warnings, and a
+  buy-and-hold benchmark.
+- **Tests first:** 25 hand-computed mechanics tests on a synthetic CSV fixture, plus 10 engine
+  scenarios and 6 service/API tests.
+
+### Phase 2b limitations
+
+- End-of-day quotes only, filled at the next day's snapshot.
+- AM settlement and dividend-driven early assignment aren't modeled.
+- No partial closes, and adjusted contracts aren't handled.
+- You must import option quotes (with `exercise_style`) and underlying bars yourself.
+
+### What Phase 2.5 added
+
+#### Details
 
 - **Game shell instead of a website.**
   - Pixel-font HUD with a "PAPER ONLY" shield, your level and process-XP bar, and NYSE status.
@@ -54,7 +93,7 @@ Next: options backtesting (Phase 2b). See [`docs/PLAN.md`](docs/PLAN.md).
 
 Details: [`docs/GAME.md`](docs/GAME.md).
 
-### Phase 2.5 limitations
+#### Phase 2.5 limitations
 
 - Agents are not AI yet. They restate computed facts. AI-backed agents reporting to a Claude
   reviewer come in a later phase (see the plan).

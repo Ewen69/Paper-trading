@@ -18,16 +18,17 @@ from ptl.backtest.engine import run_backtest
 from ptl.backtest.metrics import (
     Estimate,
     FloatArray,
+    Performance,
     bootstrap_info,
     daily_returns,
     paired_bootstrap,
     performance,
 )
-from ptl.backtest.models import CostModel, EngineResult, EquityPoint, PriceBar
+from ptl.backtest.models import CostModel, EquityPoint, PriceBar
 from ptl.backtest.report import (
     BacktestReport,
     BootstrapOut,
-    CostsOut,
+    CostLine,
     CurvePoint,
     EstimateOut,
     IntervalOut,
@@ -92,7 +93,7 @@ def to_price_bars(bars: Sequence[EquityBar]) -> tuple[list[PriceBar], PriceBasis
     return [PriceBar(b.session_date, b.open, b.high, b.low, b.close) for b in bars], "raw"
 
 
-def _dataset(conn: sqlite3.Connection, dataset_id: int) -> data_repo.DatasetRecord:
+def load_dataset(conn: sqlite3.Connection, dataset_id: int) -> data_repo.DatasetRecord:
     record = next((d for d in data_repo.list_datasets(conn) if d.id == dataset_id), None)
     if record is None:
         raise BacktestRefusedError(f"No data: dataset #{dataset_id} does not exist.")
@@ -101,7 +102,7 @@ def _dataset(conn: sqlite3.Connection, dataset_id: int) -> data_repo.DatasetReco
     return record
 
 
-def _bars(conn: sqlite3.Connection, dataset_id: int, symbol: str) -> list[EquityBar]:
+def load_bars(conn: sqlite3.Connection, dataset_id: int, symbol: str) -> list[EquityBar]:
     bars = repo.load_equity_bars(conn, dataset_id, symbol)
     if not bars:
         raise BacktestRefusedError(f"No data: dataset #{dataset_id} has no bars for {symbol}.")
@@ -125,7 +126,7 @@ def create_lock(  # noqa: PLR0913 - keyword-only options after `now`
             f"Out-of-sample fraction must be between {MIN_OOS_FRACTION:.0%} and "
             f"{MAX_OOS_FRACTION:.0%}."
         )
-    bars = bars if bars is not None else _bars(conn, dataset_id, symbol)
+    bars = bars if bars is not None else load_bars(conn, dataset_id, symbol)
     if len(bars) < MIN_SESSIONS_TO_LOCK:
         raise BacktestRefusedError(
             f"{symbol} has {len(bars)} sessions; at least {MIN_SESSIONS_TO_LOCK} are needed to "
@@ -147,7 +148,7 @@ def create_lock(  # noqa: PLR0913 - keyword-only options after `now`
 
 
 @dataclass(frozen=True, slots=True)
-class _Window:
+class Window:
     bars: list[EquityBar]  # everything the engine may see (warm-up + window)
     start: int  # index of the first bar in the window
 
@@ -160,7 +161,7 @@ class _Window:
         return self.bars[-1].session_date
 
 
-def _window(bars: list[EquityBar], lock: OosLock, period: Period) -> _Window:
+def resolve_window(bars: list[EquityBar], lock: OosLock, period: Period) -> Window:
     if period == "in-sample":
         visible = [b for b in bars if b.session_date < lock.oos_start]
         if len(visible) < MIN_IN_SAMPLE_SESSIONS:
@@ -168,17 +169,17 @@ def _window(bars: list[EquityBar], lock: OosLock, period: Period) -> _Window:
                 f"Only {len(visible)} in-sample sessions before the out-of-sample start "
                 f"{lock.oos_start}; at least {MIN_IN_SAMPLE_SESSIONS} are needed."
             )
-        return _Window(visible, 0)
+        return Window(visible, 0)
     start = next((i for i, b in enumerate(bars) if b.session_date >= lock.oos_start), len(bars))
     if len(bars) - start < MIN_OOS_SESSIONS:
         raise BacktestRefusedError(
             f"Only {len(bars) - start} out-of-sample sessions from {lock.oos_start} in this "
             f"dataset; at least {MIN_OOS_SESSIONS} are needed."
         )
-    return _Window(bars, start)
+    return Window(bars, start)
 
 
-def _quality_gate(
+def quality_gate(
     bars: Sequence[EquityBar], calendar: MarketCalendar, label: str
 ) -> list[RunWarning]:
     issues = check_equity_bars(bars, calendar)
@@ -199,7 +200,7 @@ def _quality_gate(
     ]
 
 
-def _benchmark_window(bars: list[EquityBar], first: date, last: date, symbol: str) -> _Window:
+def benchmark_window(bars: list[EquityBar], first: date, last: date, symbol: str) -> Window:
     visible = [b for b in bars if b.session_date <= last]
     if not visible or visible[0].session_date > first or visible[-1].session_date < last:
         cover = f"{bars[0].session_date}..{bars[-1].session_date}" if bars else "nothing"
@@ -207,10 +208,10 @@ def _benchmark_window(bars: list[EquityBar], first: date, last: date, symbol: st
             f"No data: benchmark {symbol} covers {cover}, but the window is {first}..{last}."
         )
     start = next(i for i, b in enumerate(visible) if b.session_date >= first)
-    return _Window(visible, start)
+    return Window(visible, start)
 
 
-def _aligned_returns(
+def aligned_returns(
     initial: float, a: Sequence[EquityPoint], b: Sequence[EquityPoint]
 ) -> tuple[FloatArray, FloatArray]:
     by_day_b = {p.day: p for p in b}
@@ -221,17 +222,109 @@ def _aligned_returns(
     )
 
 
-def _curve(strategy: EngineResult, benchmark: EngineResult) -> list[CurvePoint]:
-    s = {p.day: p.equity for p in strategy.equity}
-    b = {p.day: p.equity for p in benchmark.equity}
+def curve_points(
+    strategy: Sequence[EquityPoint], benchmark: Sequence[EquityPoint]
+) -> list[CurvePoint]:
+    s = {p.day: p.equity for p in strategy}
+    b = {p.day: p.equity for p in benchmark}
     return [CurvePoint(day=d, strategy=s.get(d), benchmark=b.get(d)) for d in sorted(s | b)]
 
 
-def _pct(x: float) -> str:
+def pct(x: float) -> str:
     return f"{x * 100:.2f}%"
 
 
-def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide the order of the rules
+def rigor_warnings(  # noqa: PLR0913
+    *,
+    perf: Performance,
+    excess: Estimate,
+    counts: repo.RunCounts,
+    period: Period,
+    symbol: str,
+    bench_symbol: str,
+) -> list[RunWarning]:
+    """Warnings every backtest gets, each traceable to a number in its report."""
+    out: list[RunWarning] = []
+    if perf.trade_count < LOW_TRADE_COUNT:
+        out.append(
+            RunWarning(
+                "low_trades",
+                f"Only {perf.trade_count} trade(s). Win rate and expectancy are unreliable "
+                f"below {LOW_TRADE_COUNT} trades.",
+            )
+        )
+    if perf.sessions < ONE_YEAR_SESSIONS:
+        out.append(
+            RunWarning("short_sample", f"Only {perf.sessions} sessions (under one year of data).")
+        )
+    if excess.ci is None:
+        out.append(
+            RunWarning("no_ci", "Too few sessions for a confidence interval on excess return.")
+        )
+    elif excess.ci.contains(0.0):
+        out.append(
+            RunWarning(
+                "ci_includes_zero",
+                f"The 95% CI for annualized excess return vs {bench_symbol} is "
+                f"{pct(excess.ci.low)} to {pct(excess.ci.high)}. It includes 0, so this "
+                "backtest does not distinguish the strategy from buy-and-hold.",
+            )
+        )
+    if period == "in-sample" and counts.in_sample_combinations_this_strategy > 1:
+        out.append(
+            RunWarning(
+                "many_trials",
+                f"{counts.in_sample_combinations_this_strategy} parameter combinations of this "
+                f"strategy have been tried on {symbol} in-sample. The best of several tries is "
+                "biased upward; judge it on out-of-sample data.",
+            )
+        )
+    if period == "out-of-sample" and counts.oos_evaluations > 1:
+        out.append(
+            RunWarning(
+                "oos_repeat",
+                f"The out-of-sample period for {symbol} has now been evaluated "
+                f"{counts.oos_evaluations} times. Each look makes it less of a clean holdout.",
+            )
+        )
+    return out
+
+
+def run_summary(perf: Performance, excess: Estimate) -> dict[str, float | int | None]:
+    """Headline numbers stored in the append-only run log."""
+    return {
+        "total_return": perf.total_return,
+        "annualized_return": perf.annualized_return.value,
+        "sharpe": perf.sharpe.value,
+        "max_drawdown": perf.max_drawdown,
+        "trades": perf.trade_count,
+        "excess_annualized_return": excess.value,
+        "excess_ci_low": excess.ci.low if excess.ci else None,
+        "excess_ci_high": excess.ci.high if excess.ci else None,
+        "sessions": perf.sessions,
+    }
+
+
+def bootstrap_out(sessions: int) -> BootstrapOut:
+    info = bootstrap_info(sessions)
+    return BootstrapOut(
+        method=info.method,
+        resamples=info.resamples,
+        block_length=info.block_length,
+        seed=info.seed,
+        confidence=info.confidence,
+    )
+
+
+def equity_cost_lines(costs: CostModel) -> list[CostLine]:
+    return [
+        CostLine(label="Slippage", value=f"{costs.slippage_bps:g} bps per side"),
+        CostLine(label="Commission per order", value=f"${costs.commission_per_order:,.2f}"),
+        CostLine(label="Commission", value=f"{costs.commission_bps:g} bps of notional"),
+    ]
+
+
+def run(
     conn: sqlite3.Connection, request: RunRequest, calendar: MarketCalendar, now: datetime
 ) -> BacktestReport:
     spec = STRATEGIES.get(request.strategy_id)
@@ -245,23 +338,23 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
         raise BacktestRefusedError("Initial capital must be positive.")
 
     symbol = request.symbol.strip().upper()
-    dataset = _dataset(conn, request.dataset_id)
-    all_bars = _bars(conn, dataset.id, symbol)
+    dataset = load_dataset(conn, request.dataset_id)
+    all_bars = load_bars(conn, dataset.id, symbol)
     lock = repo.get_lock(conn, symbol) or create_lock(conn, dataset.id, symbol, now, bars=all_bars)
-    window = _window(all_bars, lock, request.period)
-    warnings = _quality_gate(window.bars, calendar, symbol)
+    window = resolve_window(all_bars, lock, request.period)
+    warnings = quality_gate(window.bars, calendar, symbol)
 
     bench_dataset_id = request.benchmark_dataset_id or dataset.id
-    bench_dataset = _dataset(conn, bench_dataset_id)
+    bench_dataset = load_dataset(conn, bench_dataset_id)
     bench_symbol = (request.benchmark_symbol or "").strip().upper()
     if not bench_symbol:
         has_spy = repo.load_equity_bars(conn, bench_dataset_id, DEFAULT_BENCHMARK)
         bench_symbol = DEFAULT_BENCHMARK if has_spy else symbol
-    bench_window = _benchmark_window(
-        _bars(conn, bench_dataset_id, bench_symbol), window.first, window.last, bench_symbol
+    bench_window = benchmark_window(
+        load_bars(conn, bench_dataset_id, bench_symbol), window.first, window.last, bench_symbol
     )
     if bench_symbol != symbol or bench_dataset_id != dataset.id:
-        warnings += _quality_gate(bench_window.bars, calendar, f"Benchmark {bench_symbol}")
+        warnings += quality_gate(bench_window.bars, calendar, f"Benchmark {bench_symbol}")
 
     price_bars, basis = to_price_bars(window.bars)
     bench_bars, bench_basis = to_price_bars(bench_window.bars)
@@ -272,7 +365,7 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
         bench_bars, bench_window.start, BuyAndHold(), request.costs, request.initial_capital
     )
 
-    s_ret, b_ret = _aligned_returns(request.initial_capital, result.equity, bench.equity)
+    s_ret, b_ret = aligned_returns(request.initial_capital, result.equity, bench.equity)
     boot = paired_bootstrap(s_ret, b_ret)
     s_perf = performance(result, boot.strategy_annualized, boot.strategy_sharpe)
     b_perf = performance(bench, boot.benchmark_annualized, boot.benchmark_sharpe)
@@ -292,17 +385,7 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
         dataset_sha256=dataset.sha256,
         window=(window.first, window.last),
         benchmark_symbol=bench_symbol,
-        summary={
-            "total_return": s_perf.total_return,
-            "annualized_return": s_ann,
-            "sharpe": s_perf.sharpe.value,
-            "max_drawdown": s_perf.max_drawdown,
-            "trades": s_perf.trade_count,
-            "excess_annualized_return": excess.value,
-            "excess_ci_low": excess.ci.low if excess.ci else None,
-            "excess_ci_high": excess.ci.high if excess.ci else None,
-            "sessions": s_perf.sessions,
-        },
+        summary=run_summary(s_perf, excess),
     )
     counts = repo.run_counts(conn, symbol, spec.id)
 
@@ -318,36 +401,14 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
             f"signal. It held cash for about the first {strategy.warmup - window.start} sessions "
             "of this window, while the benchmark was invested.",
         )
-    if s_perf.trade_count < LOW_TRADE_COUNT:
-        warn(
-            "low_trades",
-            f"Only {s_perf.trade_count} trade(s). Win rate and expectancy are unreliable below "
-            f"{LOW_TRADE_COUNT} trades.",
-        )
-    if s_perf.sessions < ONE_YEAR_SESSIONS:
-        warn("short_sample", f"Only {s_perf.sessions} sessions (under one year of data).")
-    if excess.ci is None:
-        warn("no_ci", "Too few sessions for a confidence interval on excess return.")
-    elif excess.ci.contains(0.0):
-        warn(
-            "ci_includes_zero",
-            f"The 95% CI for annualized excess return vs {bench_symbol} is "
-            f"{_pct(excess.ci.low)} to {_pct(excess.ci.high)}. It includes 0, so this backtest "
-            "does not distinguish the strategy from buy-and-hold.",
-        )
-    if request.period == "in-sample" and counts.in_sample_combinations_this_strategy > 1:
-        warn(
-            "many_trials",
-            f"{counts.in_sample_combinations_this_strategy} parameter combinations of this "
-            f"strategy have been tried on {symbol} in-sample. The best of several tries is "
-            "biased upward; judge it on out-of-sample data.",
-        )
-    if request.period == "out-of-sample" and counts.oos_evaluations > 1:
-        warn(
-            "oos_repeat",
-            f"The out-of-sample period for {symbol} has now been evaluated "
-            f"{counts.oos_evaluations} times. Each look makes it less of a clean holdout.",
-        )
+    warnings += rigor_warnings(
+        perf=s_perf,
+        excess=excess,
+        counts=counts,
+        period=request.period,
+        symbol=symbol,
+        bench_symbol=bench_symbol,
+    )
     if basis == "raw":
         warn(
             "raw_prices",
@@ -362,7 +423,6 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
         )
 
     repo.record_warnings(conn, run_id, warnings)
-    info = bootstrap_info(len(s_ret))
     return BacktestReport(
         run_id=run_id,
         symbol=symbol,
@@ -371,7 +431,7 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
         strategy_metrics=PerformanceOut.of(s_perf),
         benchmark_metrics=PerformanceOut.of(b_perf),
         excess_annualized_return=EstimateOut(value=excess.value, ci95=IntervalOut.of(excess.ci)),
-        curve=_curve(result, bench),
+        curve=curve_points(result.equity, bench.equity),
         trades=[TradeOut.of(t) for t in result.trades],
         reality_check=RealityCheck(
             period=request.period,
@@ -386,20 +446,14 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
             oos_start=lock.oos_start,
             oos_locked_at=lock.locked_at,
             oos_lock_basis=lock.basis,
-            costs=CostsOut(**asdict(request.costs)),
+            cost_lines=equity_cost_lines(request.costs),
             initial_capital=request.initial_capital,
             price_basis=basis,
             benchmark_price_basis=bench_basis,
             fill_model=FILL_MODEL,
             cash_yield="0%: idle cash earns nothing in this backtest",
             sharpe_risk_free="0%",
-            bootstrap=BootstrapOut(
-                method=info.method,
-                resamples=info.resamples,
-                block_length=info.block_length,
-                seed=info.seed,
-                confidence=info.confidence,
-            ),
+            bootstrap=bootstrap_out(len(s_ret)),
             warnings=[WarningOut(code=w.code, text=w.text) for w in warnings],
         ),
         provenance=Provenance(

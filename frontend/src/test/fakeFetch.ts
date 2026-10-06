@@ -100,9 +100,10 @@ export const quotePayload = {
 };
 
 export const strategiesPayload = [
-  { id: 'buy_and_hold', name: 'Buy and hold', description: 'Benchmark.', params: [] },
+  { id: 'buy_and_hold', asset: 'equity', name: 'Buy and hold', description: 'Benchmark.', params: [] },
   {
     id: 'sma_crossover',
+    asset: 'equity',
     name: 'Moving-average crossover',
     description: 'Fast above slow means invested.',
     params: [
@@ -189,7 +190,11 @@ export const reportPayload = {
     oos_start: '2023-01-03',
     oos_locked_at: '2026-10-05T15:00:00+00:00',
     oos_lock_basis: 'Most recent 30% of 2515 sessions.',
-    costs: { slippage_bps: 5, commission_per_order: 0, commission_bps: 0 },
+    cost_lines: [
+      { label: 'Slippage', value: '5 bps per side' },
+      { label: 'Commission per order', value: '$0.00' },
+      { label: 'Commission', value: '0 bps of notional' },
+    ],
     initial_capital: 100_000,
     price_basis: 'adjusted',
     benchmark_price_basis: 'adjusted',
