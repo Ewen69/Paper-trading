@@ -2,6 +2,7 @@ import type { z } from 'zod';
 
 import {
   dataHealthSchema,
+  gameStateSchema,
   healthSchema,
   quoteSchema,
   reportSchema,
@@ -80,3 +81,6 @@ export interface RunPayload {
 }
 
 export const runBacktest = (payload: RunPayload) => postJson('/backtest/runs', payload, reportSchema);
+
+export const fetchGameState = (signal?: AbortSignal) =>
+  getJson('/game/state', gameStateSchema, signal);

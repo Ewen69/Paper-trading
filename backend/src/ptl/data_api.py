@@ -1,6 +1,6 @@
 """HTTP API for the data layer: Data Health and live quotes. Every payload carries provenance."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -114,6 +114,67 @@ def _issue_status(issues: list[QualityIssue], stale: bool) -> Status:
     return "ok"
 
 
+def compute_data_health(
+    settings: Settings, source: QuoteSource, calendar: MarketCalendar, now: datetime
+) -> DataHealthOut:
+    """The Data Health report. Shared by the API route and the game's Data Scout."""
+    live = source.status()
+    live_status: Status = (
+        "ok" if live.reachable else ("warning" if not live.configured else "error")
+    )
+    datasets: list[DatasetOut] = []
+    with open_db(settings.database_path) as conn:
+        for record in repository.list_datasets(conn):
+            issues = repository.issues_for(conn, record.id)
+            staleness = dataset_staleness(
+                record.coverage_end, now, calendar, settings.dataset_stale_after_sessions
+            )
+            datasets.append(
+                DatasetOut(
+                    id=record.id,
+                    kind=record.kind,
+                    file_name=record.file_name,
+                    row_count=record.row_count,
+                    symbol_count=record.symbol_count,
+                    coverage_start=record.coverage_start,
+                    coverage_end=record.coverage_end,
+                    status=_issue_status(issues, staleness.stale),
+                    issues=[IssueOut.of(i) for i in issues],
+                    provenance=Provenance(
+                        source=record.source,
+                        as_of=record.imported_at,
+                        data_type=record.data_type,
+                        stale=staleness.stale,
+                        stale_reason=staleness.reason,
+                    ),
+                )
+            )
+
+    statuses = [live_status, *(d.status for d in datasets)]
+    overall: Literal["ok", "warning", "error", "no data"] = max(statuses, key=_RANK.__getitem__)
+    if not datasets and not live.reachable:
+        overall = "no data"
+    return DataHealthOut(
+        overall=overall,
+        as_of=now,
+        source="Paper Trading Lab data layer (local SQLite + live source check)",
+        market_open=calendar.is_open(now),
+        last_completed_session=calendar.last_completed_session(now),
+        live_source=LiveSourceOut(
+            name=live.name,
+            status=live_status,
+            configured=live.configured,
+            reachable=live.reachable,
+            account_status=live.account_status,
+            error=live.error,
+            checked_at=live.checked_at,
+            stock_feed=FeedOut.of(live.stock_feed),
+            option_feed=FeedOut.of(live.option_feed),
+        ),
+        datasets=datasets,
+    )
+
+
 def build_data_router(
     settings: Settings, source: QuoteSource, calendar: MarketCalendar, clock: Clock
 ) -> APIRouter:
@@ -121,62 +182,7 @@ def build_data_router(
 
     @router.get("/data/health")
     def data_health() -> DataHealthOut:
-        now = clock()
-        live = source.status()
-        live_status: Status = (
-            "ok" if live.reachable else ("warning" if not live.configured else "error")
-        )
-        datasets: list[DatasetOut] = []
-        with open_db(settings.database_path) as conn:
-            for record in repository.list_datasets(conn):
-                issues = repository.issues_for(conn, record.id)
-                staleness = dataset_staleness(
-                    record.coverage_end, now, calendar, settings.dataset_stale_after_sessions
-                )
-                datasets.append(
-                    DatasetOut(
-                        id=record.id,
-                        kind=record.kind,
-                        file_name=record.file_name,
-                        row_count=record.row_count,
-                        symbol_count=record.symbol_count,
-                        coverage_start=record.coverage_start,
-                        coverage_end=record.coverage_end,
-                        status=_issue_status(issues, staleness.stale),
-                        issues=[IssueOut.of(i) for i in issues],
-                        provenance=Provenance(
-                            source=record.source,
-                            as_of=record.imported_at,
-                            data_type=record.data_type,
-                            stale=staleness.stale,
-                            stale_reason=staleness.reason,
-                        ),
-                    )
-                )
-
-        statuses = [live_status, *(d.status for d in datasets)]
-        overall: Literal["ok", "warning", "error", "no data"] = max(statuses, key=_RANK.__getitem__)
-        if not datasets and not live.reachable:
-            overall = "no data"
-        return DataHealthOut(
-            overall=overall,
-            as_of=now,
-            source="Paper Trading Lab data layer (local SQLite + live source check)",
-            market_open=calendar.is_open(now),
-            last_completed_session=calendar.last_completed_session(now),
-            live_source=LiveSourceOut(
-                name=live.name,
-                status=live_status,
-                configured=live.configured,
-                reachable=live.reachable,
-                account_status=live.account_status,
-                error=live.error,
-                checked_at=live.checked_at,
-                stock_feed=FeedOut.of(live.stock_feed),
-                option_feed=FeedOut.of(live.option_feed),
-            ),
-            datasets=datasets,
-        )
+        return compute_data_health(settings, source, calendar, clock())
 
     def _respond(quote: LiveQuote, feed: FeedInfo) -> QuoteOut:
         staleness = live_quote_staleness(

@@ -49,6 +49,7 @@ class RunRecord:
     period: Period
     strategy: str
     params: dict[str, int]
+    costs: dict[str, float]
     window_start: date
     window_end: date
     summary: dict[str, float | int | None]
@@ -184,19 +185,27 @@ def run_counts(conn: sqlite3.Connection, symbol: str, strategy: str) -> RunCount
     return RunCounts(row[0], row[1], row[2] or 0, row[3] or 0)
 
 
+def _run_record(r: sqlite3.Row) -> RunRecord:
+    return RunRecord(
+        id=r["id"],
+        created_at=datetime.fromisoformat(r["created_at"]),
+        symbol=r["symbol"],
+        period=r["period"],
+        strategy=r["strategy"],
+        params=json.loads(r["params"]),
+        costs=json.loads(r["costs"]),
+        window_start=date.fromisoformat(r["window_start"]),
+        window_end=date.fromisoformat(r["window_end"]),
+        summary=json.loads(r["summary"]),
+    )
+
+
 def list_runs(conn: sqlite3.Connection, limit: int = 200) -> list[RunRecord]:
+    """Most recent runs first."""
     rows = conn.execute("SELECT * FROM backtest_runs ORDER BY id DESC LIMIT ?", (limit,))
-    return [
-        RunRecord(
-            id=r["id"],
-            created_at=datetime.fromisoformat(r["created_at"]),
-            symbol=r["symbol"],
-            period=r["period"],
-            strategy=r["strategy"],
-            params=json.loads(r["params"]),
-            window_start=date.fromisoformat(r["window_start"]),
-            window_end=date.fromisoformat(r["window_end"]),
-            summary=json.loads(r["summary"]),
-        )
-        for r in rows
-    ]
+    return [_run_record(r) for r in rows]
+
+
+def all_runs(conn: sqlite3.Connection) -> list[RunRecord]:
+    """The whole append-only log, oldest first."""
+    return [_run_record(r) for r in conn.execute("SELECT * FROM backtest_runs ORDER BY id")]

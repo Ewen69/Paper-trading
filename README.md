@@ -6,12 +6,45 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 2a (core backtester)
+## Status: Phase 2.5 (game UI)
 
-Next: a game-style UI with agent characters (Phase 2.5), then options backtesting (2b). See
-[`docs/PLAN.md`](docs/PLAN.md).
+Next: options backtesting (Phase 2b). See [`docs/PLAN.md`](docs/PLAN.md).
 
-### What Phase 2a adds
+### What Phase 2.5 adds
+
+- **Game shell instead of a website.**
+  - Pixel-font HUD with a "PAPER ONLY" shield, your level and process-XP bar, and NYSE status.
+  - Hotbar of stations: press **1** HQ, **2** Data Scout, **3** Quant.
+  - Command-deck look with framed panels. Animations turn off when your system asks for
+    reduced motion.
+- **HQ and your agent squad.** Pixel characters stand on pads, each with a status light and
+  label (Ready / Caution / Alert / Idle), a level, and a speech bubble.
+  - **Data Scout** reports data-health facts.
+  - **Quant** reports backtest-log facts, including when too many tries have biased a symbol's
+    results.
+  - **Locked agents** show as silhouettes with the phase that unlocks them: Risk Officer, Paper
+    Trader, Accountant, Analyst, Lead Reviewer.
+- **Mission log.** Every import, out-of-sample lock and backtest run, with its source, time
+  and the XP it earned (or why it earned none).
+- **Process-only XP and badges.**
+  - XP comes from importing data, sealing out-of-sample periods, and testing out-of-sample
+    once after in-sample work.
+  - Profit never earns XP, and repeat looks at out-of-sample data earn nothing.
+  - Badges: First Contact, Clean Room, Sealed Vault, Restraint, One Shot (lost if you look
+    again), Cost Realist.
+  - Toasts pop when a new event lands.
+- **Truth comes from the backend.** `GET /game/state` computes all of the above from local
+  records and the live source check. The UI only renders it.
+
+### Phase 2.5 limitations
+
+- Agents are not AI yet. They restate computed facts. AI-backed agents reporting to a Claude
+  reviewer come in a later phase (see the plan).
+- XP and badges only cover what the app logs. Paper trading and risk badges arrive with
+  Phase 3.
+- Game state refreshes when you switch stations or finish a run; it doesn't poll.
+
+### What Phase 2a added
 
 How it works in detail: [`docs/BACKTESTING.md`](docs/BACKTESTING.md).
 

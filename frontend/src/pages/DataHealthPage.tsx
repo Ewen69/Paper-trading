@@ -108,7 +108,7 @@ export function DataHealthPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold">Data Health</h2>
+          <h2 className="font-pixel text-xs uppercase text-slate-100">Data Health</h2>
           {state.kind === 'ready' && (
             <Badge tone={statusTone(state.data.overall)}>{state.data.overall}</Badge>
           )}
@@ -116,7 +116,7 @@ export function DataHealthPage() {
         <button
           type="button"
           onClick={reload}
-          className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800"
+          className="btn-pixel bg-slate-700 px-3 py-2 text-slate-100 hover:bg-slate-600"
         >
           Refresh
         </button>

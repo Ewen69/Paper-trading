@@ -61,7 +61,7 @@ export function QuoteLookup() {
         <button
           type="submit"
           disabled={state.kind === 'loading'}
-          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="btn-pixel bg-sky-600 px-4 py-2 text-white hover:bg-sky-500 disabled:opacity-50"
         >
           {state.kind === 'loading' ? 'Fetching…' : 'Get quote'}
         </button>

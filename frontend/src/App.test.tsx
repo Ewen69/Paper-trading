@@ -1,38 +1,60 @@
 // Fetch is stubbed with test-only fixtures; production code never fabricates data.
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { healthSchema } from './api/schemas';
 import { App } from './App';
 import { healthPayload, stubFetch } from './test/fakeFetch';
+import { gameStatePayload } from './test/gameFixtures';
 
-describe('Home', () => {
+describe('HQ', () => {
   beforeEach(() => {
     window.location.hash = '';
   });
 
-  it('shows health with source and timestamp when the backend responds', async () => {
-    stubFetch({ '/health': healthPayload });
+  it('shows backend health with source and timestamp', async () => {
+    stubFetch({ '/health': healthPayload, '/game/state': gameStatePayload });
     render(<App />);
-
     expect(await screen.findByText('https://paper-api.alpaca.markets')).toBeInTheDocument();
     expect(screen.getByText('backend server clock')).toBeInTheDocument();
     expect(screen.getByText('not configured')).toBeInTheDocument();
-    expect(document.querySelector('time')?.getAttribute('datetime')).toBe(
-      '2026-10-05T12:00:00.000Z',
+  });
+
+  it('says "No data" for each part that is unreachable', async () => {
+    stubFetch({ '/health': new TypeError('Failed to fetch'), '/game/state': new TypeError('down') });
+    render(<App />);
+    await screen.findByText(/Backend unreachable/);
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((a) => a.textContent)).toEqual([
+      expect.stringContaining('Game state unavailable'),
+      expect.stringContaining('Backend unreachable'),
+    ]);
+    expect(screen.getByText('XP: no data')).toBeInTheDocument();
+  });
+
+  it('rejects a health payload that does not match the schema', async () => {
+    stubFetch({
+      '/health': { ...healthPayload, as_of: undefined },
+      '/game/state': gameStatePayload,
+    });
+    render(<App />);
+    expect(await screen.findByText(/unexpected response/)).toBeInTheDocument();
+  });
+
+  it('renders agents with real report lines, sources, and locked silhouettes', async () => {
+    stubFetch({ '/health': healthPayload, '/game/state': gameStatePayload });
+    render(<App />);
+    const scout = await screen.findByRole('article', { name: 'Data Scout' });
+    expect(within(scout).getByText('Caution')).toBeInTheDocument();
+    expect(within(scout).getByText(/Live feed offline/)).toBeInTheDocument();
+    expect(within(scout).getByText(/Alpaca paper account check ·/)).toBeInTheDocument();
+    expect(within(scout).getByRole('link', { name: /Enter station/ })).toHaveAttribute(
+      'href',
+      '#data-health',
     );
-  });
-
-  it('shows "No data" when the backend is unreachable', async () => {
-    stubFetch({ '/health': new TypeError('Failed to fetch') });
-    render(<App />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('No data');
-  });
-
-  it('shows "No data" when the payload does not match the schema', async () => {
-    stubFetch({ '/health': { ...healthPayload, as_of: undefined } });
-    render(<App />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('unexpected response');
+    const risk = screen.getByRole('article', { name: 'Risk Officer (locked)' });
+    expect(within(risk).getByText(/Unlocks in Phase 3/)).toBeInTheDocument();
+    expect(within(risk).queryByRole('link')).toBeNull();
   });
 });
 

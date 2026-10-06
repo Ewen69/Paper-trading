@@ -1,5 +1,135 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+}
+
 :root {
   color-scheme: dark;
+}
+
+/* Command-deck backdrop: deep navy, faint grid, a soft glow. Static, so it never distracts. */
+body {
+  background-color: #050816;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(56 189 248 / 0.12), transparent 60%),
+    linear-gradient(rgb(148 163 184 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(148 163 184 / 0.05) 1px, transparent 1px);
+  background-size:
+    auto,
+    32px 32px,
+    32px 32px;
+  background-attachment: fixed;
+}
+
+/* Faint CRT scanlines over everything; pointer-events none so it never blocks input. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0) 0,
+    rgb(0 0 0 / 0) 2px,
+    rgb(0 0 0 / 0.08) 3px
+  );
+  z-index: 50;
+}
+
+/* Game window: hard edges, inset bevel, glowing corner brackets. */
+.panel {
+  position: relative;
+  border: 2px solid #1e293b;
+  background: linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(2 6 23 / 0.94));
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 1px rgb(148 163 184 / 0.08),
+    0 10px 30px rgb(0 0 0 / 0.45);
+}
+.panel::before,
+.panel::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: #38bdf8;
+  pointer-events: none;
+}
+.panel::before {
+  top: -2px;
+  left: -2px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+.panel::after {
+  bottom: -2px;
+  right: -2px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+/* Chunky arcade button. */
+.btn-pixel {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 4px solid rgb(0 0 0 / 0.45);
+  transition: transform 60ms;
+}
+.btn-pixel:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+
+/* XP bar with stepped fill, like a game HUD. */
+.xp-bar {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #facc15 0,
+    #facc15 6px,
+    #eab308 6px,
+    #eab308 8px
+  );
+}
+
+@keyframes sprite-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.sprite-idle {
+  animation: sprite-bob 1.4s steps(2, jump-none) infinite;
+}
+
+@keyframes led-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.led-pulse {
+  animation: led-pulse 1s steps(2, jump-none) infinite;
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+.toast-in {
+  animation: toast-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-idle,
+  .led-pulse,
+  .toast-in {
+    animation: none;
+  }
 }

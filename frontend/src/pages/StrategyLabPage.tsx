@@ -233,7 +233,7 @@ function LabForm({
             <button
               type="submit"
               disabled={run.kind === 'running' || !entry || !strategy}
-              className="rounded-lg bg-sky-600 px-5 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+              className="btn-pixel bg-sky-600 px-5 py-3 text-white hover:bg-sky-500 disabled:opacity-50"
             >
               {run.kind === 'running' ? 'Running…' : 'Run backtest'}
             </button>
@@ -324,7 +324,7 @@ function Results({ report }: { report: Report }) {
   );
 }
 
-export function StrategyLabPage() {
+export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
   const [universe, reloadUniverse] = useApi(fetchUniverse);
   const [strategies] = useApi(fetchStrategies);
 
@@ -342,7 +342,7 @@ export function StrategyLabPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">Strategy Lab</h2>
+        <h2 className="font-pixel text-xs uppercase text-slate-100">Strategy Lab</h2>
         <Provenance source={universe.data.source} asOf={universe.data.as_of} asOfLabel="loaded" />
       </div>
       {universe.data.entries.length === 0 ? (
@@ -359,7 +359,10 @@ export function StrategyLabPage() {
         <LabForm
           universe={universe.data.entries}
           strategies={strategies.data}
-          onDone={reloadUniverse}
+          onDone={() => {
+            reloadUniverse();
+            onActivity?.();
+          }}
         />
       )}
     </div>

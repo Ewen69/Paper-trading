@@ -235,3 +235,62 @@ export const reportSchema = z.object({
   benchmark_provenance: provenanceSchema,
 });
 export type Report = z.infer<typeof reportSchema>;
+
+// ---- Game layer (agents, XP, badges) ----
+
+export const agentStatusSchema = z.enum(['ok', 'warning', 'error', 'idle', 'locked']);
+export type AgentStatus = z.infer<typeof agentStatusSchema>;
+
+const reportLineSchema = z.object({ text: z.string(), source: z.string(), as_of: isoDateTime });
+
+export const agentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string(),
+  station: z.string().nullable(),
+  status: agentStatusSchema,
+  unlocks_in: z.string().nullable(),
+  xp: z.number().int(),
+  level: z.number().int(),
+  report: z.array(reportLineSchema),
+});
+export type Agent = z.infer<typeof agentSchema>;
+
+export const gameEventSchema = z.object({
+  at: isoDateTime,
+  agent: z.string(),
+  kind: z.string(),
+  text: z.string(),
+  xp: z.number().int(),
+  xp_note: z.string().nullable(),
+  source: z.string(),
+});
+export type GameEvent = z.infer<typeof gameEventSchema>;
+
+export const gameStateSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  market_open: z.boolean(),
+  last_completed_session: isoDate,
+  player: z.object({
+    xp: z.number().int(),
+    level: z.number().int(),
+    level_start_xp: z.number().int(),
+    next_level_xp: z.number().int(),
+  }),
+  agents: z.array(agentSchema),
+  events: z.array(gameEventSchema),
+  badges: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+      earned: z.boolean(),
+      earned_at: isoDateTime.nullable(),
+      detail: z.string().nullable(),
+    }),
+  ),
+  xp_rules: z.array(z.object({ id: z.string(), description: z.string(), xp: z.number().int() })),
+  xp_policy: z.string(),
+});
+export type GameState = z.infer<typeof gameStateSchema>;

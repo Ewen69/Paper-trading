@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+/** A game window. Titles use the pixel font; content stays in a readable face. */
 export function Card({
   title,
   actions,
@@ -10,9 +11,11 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">{title}</h2>
+    <section className="panel p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-pixel text-[10px] uppercase leading-relaxed tracking-wider text-sky-300">
+          {title}
+        </h2>
         {actions}
       </div>
       {children}
@@ -23,8 +26,8 @@ export function Card({
 export function NoData({ message }: { message: string }) {
   return (
     <div role="alert">
-      <p className="font-medium text-amber-400">No data</p>
-      <p className="text-sm text-slate-400">{message}</p>
+      <p className="font-pixel text-[10px] uppercase text-amber-400">No data</p>
+      <p className="mt-2 text-sm text-slate-400">{message}</p>
     </div>
   );
 }

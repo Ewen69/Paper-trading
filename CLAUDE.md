@@ -44,6 +44,13 @@ Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
   The frontend calls the backend via `/api/*` (Vite proxy strips `/api`).
 - Live data sources sit behind interfaces so they can be swapped. Historical data comes from
   local CSV ingestion (Alpaca does not serve free historical options data).
+- Game UI (`frontend/src/game`, backend `ptl/game.py`):
+  - Agent lines, events, XP and badges are computed by the backend from stored records only.
+    No flavor text that states a fact.
+  - XP rewards process, never returns, wins or profit. No streaks or leaderboards.
+  - Agents for unbuilt modules stay locked. A new module's agent unlocks in the phase that
+    builds it.
+- Commits use the GitHub no-reply email (the repo is public).
 
 ## Commands (run from repo root)
 
