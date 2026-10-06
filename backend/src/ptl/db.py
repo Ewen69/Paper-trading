@@ -268,6 +268,29 @@ MIGRATIONS: tuple[str, ...] = (
     );
     CREATE INDEX nw_balances_by_date ON nw_balances (as_of);
     """,
+    # 7: manual portfolio holdings. Paper positions are read live from the Alpaca paper account
+    # and never stored here. Options carry their contract terms; quantity < 0 means short.
+    """
+    CREATE TABLE pf_holdings (
+        id                 INTEGER PRIMARY KEY,
+        symbol             TEXT NOT NULL,
+        asset_class        TEXT NOT NULL CHECK (asset_class IN ('stock', 'etf', 'fund',
+                               'bond', 'cash', 'option', 'crypto', 'other')),
+        quantity           REAL NOT NULL CHECK (quantity <> 0),
+        account            TEXT NOT NULL DEFAULT '',
+        option_type        TEXT CHECK (option_type IN ('call', 'put')),
+        strike             REAL,
+        expiration         TEXT,
+        manual_price       REAL CHECK (manual_price IS NULL OR manual_price >= 0),
+        manual_price_as_of TEXT,
+        note               TEXT NOT NULL DEFAULT '',
+        created_at         TEXT NOT NULL,
+        CHECK ((asset_class = 'option') = (option_type IS NOT NULL AND strike IS NOT NULL
+                                           AND expiration IS NOT NULL)),
+        CHECK ((manual_price IS NULL) = (manual_price_as_of IS NULL)),
+        CHECK (asset_class = 'option' OR quantity > 0)
+    );
+    """,
 )
 
 

@@ -26,6 +26,7 @@ from ptl.health import build_health_router
 from ptl.market_calendar import MarketCalendar
 from ptl.networth_api import build_networth_router
 from ptl.paper.factory import broker_factory
+from ptl.portfolio_api import build_portfolio_router
 from ptl.safety import assert_paper_endpoint
 
 logger = logging.getLogger(__name__)
@@ -63,12 +64,13 @@ def create_app(
 
     calendar = calendar if calendar is not None else MarketCalendar()
     source = quote_source if quote_source is not None else AlpacaQuoteSource(settings, clock)
+    make_broker = brokers if brokers is not None else broker_factory(settings)
     runtime = AgentRuntime(
         settings,
         calendar=calendar,
         clock=clock,
         source=source,
-        broker_factory=brokers if brokers is not None else broker_factory(settings),
+        broker_factory=make_broker,
     )
 
     @asynccontextmanager
@@ -88,4 +90,5 @@ def create_app(
     app.include_router(build_backtest_router(settings, calendar, clock))
     app.include_router(build_game_router(settings, source, calendar, clock))
     app.include_router(build_networth_router(settings, clock))
+    app.include_router(build_portfolio_router(settings, calendar, clock, make_broker))
     return app

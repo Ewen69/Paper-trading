@@ -645,3 +645,100 @@ export const projectionSchema = z.object({
   note: z.string(),
 });
 export type Projection = z.infer<typeof projectionSchema>;
+
+// ---- Portfolio (manual holdings + read-only paper positions) ----
+
+const greeksSchema = z.object({ delta: z.number(), theta: z.number(), vega: z.number() });
+
+export const portfolioSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  book: z.enum(['manual', 'paper', 'combined']),
+  benchmark: z.string(),
+  window: z.number().int(),
+  paper: z.object({
+    status: z.enum(['included', 'not_requested', 'not_configured', 'error']),
+    detail: z.string(),
+  }),
+  positions: z.array(
+    z.object({
+      key: z.string(),
+      book: z.enum(['manual', 'paper']),
+      holding_id: z.number().int().nullable(),
+      symbol: z.string(),
+      label: z.string(),
+      asset_class: z.string(),
+      account: z.string(),
+      quantity: z.number(),
+      price: z.number().nullable(),
+      price_source: z.string().nullable(),
+      price_as_of: isoDate.nullable(),
+      stale: z.boolean(),
+      stale_reason: z.string().nullable(),
+      value: z.number().nullable(),
+      weight: z.number().nullable(),
+      greeks: greeksSchema.nullable(),
+      notes: z.array(z.string()),
+    }),
+  ),
+  total_value: z.number(),
+  long_value: z.number(),
+  allocation: z.array(z.object({ asset_class: z.string(), value: z.number(), weight: z.number() })),
+  concentration: z
+    .object({
+      hhi: z.number(),
+      effective_n: z.number(),
+      top: z.array(z.tuple([z.string(), z.number()])),
+      top5_weight: z.number(),
+    })
+    .nullable(),
+  risk: z
+    .object({
+      start: isoDate,
+      end: isoDate,
+      returns: z.number().int(),
+      volatility: z.number(),
+      max_drawdown: z.number(),
+      benchmark_volatility: z.number().nullable(),
+      beta: z.number().nullable(),
+      correlation: z.number().nullable(),
+    })
+    .nullable(),
+  risk_note: z.string(),
+  risk_included: z.array(z.string()),
+  risk_excluded: z.array(z.string()),
+  coverage: z.number().nullable(),
+  price_basis: z.string(),
+  greeks_total: greeksSchema.nullable(),
+  greeks_missing: z.array(z.string()),
+  tips: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.enum(['fired', 'clear', 'not_evaluated']),
+      observed: z.string(),
+      threshold: z.string(),
+      detail: z.string(),
+    }),
+  ),
+  method: z.string(),
+});
+export type Portfolio = z.infer<typeof portfolioSchema>;
+export type PortfolioPosition = Portfolio['positions'][number];
+
+export const holdingSchema = z.object({
+  id: z.number().int(),
+  created_at: isoDateTime,
+  symbol: z.string(),
+  asset_class: z.string(),
+  quantity: z.number(),
+  account: z.string(),
+  option_type: z.enum(['call', 'put']).nullable(),
+  strike: z.number().nullable(),
+  expiration: isoDate.nullable(),
+  manual_price: z.number().nullable(),
+  manual_price_as_of: isoDate.nullable(),
+  note: z.string(),
+});
+
+export const holdingsImportSchema = z.object({ imported: z.number().int(), removed: z.number().int() });

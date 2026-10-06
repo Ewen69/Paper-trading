@@ -85,7 +85,7 @@ order, fill, rejection, and the reason. Dry-run mode that logs intended orders w
 snapshots. Manual entry and CSV import/export. Net worth = assets − liabilities, history chart.
 Projections as a scenario range (defaults 4%–6% nominal), clearly labeled as assumptions.
 
-**Phase 5 — Portfolio analysis & tips.** Merge paper positions with manual holdings.
+**Phase 5 — Portfolio analysis & tips.** *(Done: see `docs/PORTFOLIO.md`. Tips are rule checks that show inputs and thresholds.)* Merge paper positions with manual holdings.
 Allocation, concentration (HHI / top-N weight), volatility, drawdown, correlation/beta to
 benchmark, aggregate delta/theta/vega. Tips are deterministic rules that display the inputs and
 threshold that fired them.

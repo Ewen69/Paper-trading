@@ -6,11 +6,44 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 4 (net worth tracker)
+## Status: Phase 5 (portfolio analysis and rule checks)
 
-Next: Phase 5 (portfolio analysis). See [`docs/PLAN.md`](docs/PLAN.md).
+Next: Phase 6 (UI/UX pass). See [`docs/PLAN.md`](docs/PLAN.md).
 
-### What Phase 4 adds
+### What Phase 5 adds
+
+Details: [`docs/PORTFOLIO.md`](docs/PORTFOLIO.md).
+
+- **Portfolio station (key 7), run by the Analyst.** You enter or import holdings (stocks, ETFs,
+  funds, bonds, cash, options, crypto), which are stored locally.
+  - The Alpaca **paper** account's positions are read read-only, as a separate book, and only
+    combined when you choose to.
+- **Every value names its price source and date:**
+  - imported end-of-day close
+  - otherwise your manual price
+  - options at the bid if long and the ask if short
+  - otherwise "not valued", listed and excluded
+- **Stale prices are flagged.**
+- **What's computed:**
+  - allocation by asset class
+  - concentration (HHI, effective N, top 5)
+  - a risk replay of today's weights against a benchmark: volatility, max drawdown, beta,
+    correlation, with dates, coverage and the price basis shown
+  - option Greek totals from vendor Greeks in imported quotes
+- **Rule checks** (the plan's "tips") are fixed rules. Each shows what it measured and its
+  threshold, and is fired, clear, or not evaluated. They flag facts, not advice.
+- **Holdings CSV import and export**, all-or-nothing, with an optional "replace all".
+
+### Phase 5 limitations
+
+- **End-of-day prices only;** no live quotes for holdings.
+- **No transaction history,** so no cost basis, realized P&L or tax lots.
+- **The short-option rule** doesn't recognize spreads.
+- **The risk replay is backward-looking,** at constant weights, and only covers symbols with
+  imported history.
+- **USD only.**
+
+### What Phase 4 added
 
 Details: [`docs/NETWORTH.md`](docs/NETWORTH.md).
 

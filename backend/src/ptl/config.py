@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     paper_dry_run_capital: float = Field(default=100_000.0, gt=0)
     # Net worth: a balance older than this many days is flagged stale.
     networth_stale_after_days: int = Field(default=45, ge=1)
+    # Portfolio: default benchmark and risk window (sessions) for volatility, drawdown and beta.
+    portfolio_benchmark: str = "SPY"
+    portfolio_window_sessions: int = Field(default=252, ge=20, le=2520)
 
     @field_validator("database_path")
     @classmethod
