@@ -5,6 +5,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // three.js alone is ~545 kB minified. It's split into its own lazily loaded chunk (the 3D
+    // HQ and portraits); the main bundle stays far below this.
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 5173,
     strictPort: true,

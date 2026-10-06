@@ -9,7 +9,7 @@ import { inputClass, NumberField } from '../components/fields';
 import { MetricsTable } from '../components/MetricsTable';
 import { Provenance } from '../components/Provenance';
 import { RealityCheckPanel } from '../components/RealityCheckPanel';
-import { AgentSprite } from '../game/AgentSprite';
+import { AgentAvatar } from '../game/AgentAvatar';
 import { pct, usd } from '../format';
 import { OptionsLab } from './OptionsLab';
 
@@ -187,7 +187,7 @@ function LabForm({
             <button
               type="submit"
               disabled={run.kind === 'running' || !entry || !strategy}
-              className="btn-pixel bg-sky-600 px-5 py-3 text-white hover:bg-sky-500 disabled:opacity-50"
+              className="btn-game bg-sky-600 px-5 py-3 text-white hover:bg-sky-500 disabled:opacity-50"
             >
               {run.kind === 'running' ? 'Running…' : 'Run backtest'}
             </button>
@@ -224,10 +224,10 @@ function BeforeYouRun({ entry }: { entry: UniverseEntry }) {
       aria-label="Reality check before you run"
     >
       <div className="shrink-0">
-        <AgentSprite agentId="auditor" size={32} animate={false} />
+        <AgentAvatar agentId="auditor" size={32} />
       </div>
       <div className="min-w-0 text-sm">
-        <p className="font-pixel text-[8px] uppercase text-amber-300">
+        <p className="font-display font-bold tracking-wide text-[11px] uppercase text-amber-300">
           Reality check before you run · {entry.symbol}
         </p>
         <ul className="mt-1.5 list-inside list-disc text-slate-300">
@@ -345,7 +345,7 @@ export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-pixel text-xs uppercase text-slate-100">Strategy Lab</h2>
+          <h2 className="font-display font-bold tracking-wide text-sm uppercase text-slate-100">Strategy Lab</h2>
           <Provenance source={universe.data.source} asOf={universe.data.as_of} asOfLabel="loaded" />
         </div>
         <div role="tablist" aria-label="Asset type" className="flex gap-1">
@@ -358,7 +358,7 @@ export function StrategyLabPage({ onActivity }: { onActivity?: () => void }) {
               onClick={() => {
                 setAsset(m.id);
               }}
-              className={`btn-pixel px-3 py-2 ${asset === m.id ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`btn-game px-3 py-2 ${asset === m.id ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               {m.label}
             </button>

@@ -56,6 +56,16 @@ describe('HQ', () => {
     expect(within(risk).getByText(/Unlocks in Phase 3/)).toBeInTheDocument();
     expect(within(risk).queryByRole('link')).toBeNull();
   });
+
+  it('falls back gracefully when WebGL is unavailable (as in this test browser)', async () => {
+    stubFetch({ '/health': healthPayload, '/game/state': gameStatePayload });
+    render(<App />);
+    expect(await screen.findByText(/3D view unavailable/)).toBeInTheDocument();
+    // Portraits fall back to initials badges; agent names are still real text.
+    const scout = screen.getByRole('article', { name: 'Data Scout' });
+    expect(within(scout).getByText('DS')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(scout).getByRole('heading', { name: 'Data Scout' })).toBeInTheDocument();
+  });
 });
 
 describe('healthSchema', () => {

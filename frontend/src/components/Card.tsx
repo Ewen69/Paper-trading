@@ -13,7 +13,7 @@ export function Card({
   return (
     <section className="panel p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-pixel text-[10px] uppercase leading-relaxed tracking-wider text-sky-300">
+        <h2 className="font-display font-bold tracking-wide text-[13px] uppercase leading-relaxed tracking-wider text-sky-300">
           {title}
         </h2>
         {actions}
@@ -26,7 +26,7 @@ export function Card({
 export function NoData({ message }: { message: string }) {
   return (
     <div role="alert">
-      <p className="font-pixel text-[10px] uppercase text-amber-400">No data</p>
+      <p className="font-display font-bold tracking-wide text-[13px] uppercase text-amber-400">No data</p>
       <p className="mt-2 text-sm text-slate-400">{message}</p>
     </div>
   );

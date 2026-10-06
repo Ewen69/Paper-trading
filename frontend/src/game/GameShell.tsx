@@ -6,7 +6,7 @@ import { useApi, type ApiState } from '../api/useApi';
 import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
 import { ACTIVITY_EVENT, announceActivity } from './activity';
-import { AgentSprite } from './AgentSprite';
+import { AgentAvatar } from './AgentAvatar';
 import { AuditPage } from './AuditPage';
 import { HQPage } from './HQPage';
 import { timeOf } from './status';
@@ -33,19 +33,19 @@ function Hud({ game }: { game: ApiState<GameState> }) {
     <header className="panel sticky top-0 z-40 mb-4 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
       <div className="flex items-center gap-3">
         <span
-          className="border-2 border-emerald-400 bg-emerald-400/10 px-2 py-1 font-pixel text-[8px] uppercase text-emerald-300"
+          className="border-2 border-emerald-400 bg-emerald-400/10 px-2 py-1 font-display font-bold tracking-wide text-[11px] uppercase text-emerald-300"
           title="Paper trading only. This app cannot place real-money orders."
         >
           🛡 Paper only
         </span>
-        <h1 className="font-pixel text-[11px] uppercase leading-relaxed text-slate-100 sm:text-xs">
+        <h1 className="font-display font-bold tracking-wide text-[14px] uppercase leading-relaxed text-slate-100 sm:text-xs">
           Paper Trading Lab
         </h1>
       </div>
       <div className="flex min-w-48 flex-1 items-center gap-3">
         {p ? (
           <>
-            <span className="font-pixel text-[10px] text-amber-300">LV {p.level}</span>
+            <span className="font-display font-bold tracking-wide text-[13px] text-amber-300">LV {p.level}</span>
             <div className="min-w-0 flex-1">
               <div
                 className="h-3 border-2 border-slate-700 bg-slate-950"
@@ -67,7 +67,7 @@ function Hud({ game }: { game: ApiState<GameState> }) {
         )}
       </div>
       {ready && (
-        <p className="font-pixel text-[8px] uppercase leading-relaxed text-slate-400">
+        <p className="font-display font-bold tracking-wide text-[11px] uppercase leading-relaxed text-slate-400">
           NYSE {ready.market_open ? 'open' : 'closed'}
           <span className="block normal-case text-slate-500">
             last session {ready.last_completed_session}
@@ -91,16 +91,16 @@ function Hotbar({ current, agents }: { current: StationId; agents: Agent[] }) {
             aria-current={active ? 'page' : undefined}
             className={`panel flex shrink-0 items-center gap-2 px-3 py-2 ${active ? 'border-sky-400' : 'hover:border-slate-500'}`}
           >
-            <span className="font-pixel text-[8px] text-slate-500" aria-hidden="true">
+            <span className="font-display font-bold tracking-wide text-[11px] text-slate-500" aria-hidden="true">
               {s.key}
             </span>
             {s.agent ? (
-              <AgentSprite agentId={s.agent} size={20} animate={false} />
+              <AgentAvatar agentId={s.agent} size={20} />
             ) : (
               <span aria-hidden="true">🏠</span>
             )}
             <span
-              className={`font-pixel text-[9px] uppercase ${active ? 'text-sky-300' : 'text-slate-300'}`}
+              className={`font-display font-bold tracking-wide text-[12px] uppercase ${active ? 'text-sky-300' : 'text-slate-300'}`}
             >
               {s.label}
             </span>
@@ -113,9 +113,9 @@ function Hotbar({ current, agents }: { current: StationId; agents: Agent[] }) {
           title={locked.map((a) => `${a.name}: unlocks in ${a.unlocks_in ?? 'a later phase'}`).join('\n')}
         >
           {locked.map((a) => (
-            <AgentSprite key={a.id} agentId={a.id} locked size={14} animate={false} />
+            <AgentAvatar key={a.id} agentId={a.id} locked size={14} />
           ))}
-          <span className="ml-1 font-pixel text-[8px] uppercase text-slate-500">
+          <span className="ml-1 font-display font-bold tracking-wide text-[11px] uppercase text-slate-500">
             🔒 {locked.length} locked
           </span>
           <span className="sr-only">
@@ -132,10 +132,10 @@ function StationHeader({ agent }: { agent: Agent | undefined }) {
   const line = agent.report[0];
   return (
     <div className="panel mb-6 flex items-center gap-4 p-4">
-      <AgentSprite agentId={agent.id} size={56} />
+      <AgentAvatar agentId={agent.id} size={56} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-pixel text-[11px] uppercase text-slate-100">{agent.name}</h2>
+          <h2 className="font-display font-bold tracking-wide text-[14px] uppercase text-slate-100">{agent.name}</h2>
           <StatusChip status={agent.status} />
         </div>
         {line && (
@@ -164,7 +164,7 @@ function Toasts({ events, onDismiss }: { events: GameEvent[]; onDismiss: () => v
     <div className="fixed right-4 top-24 z-50 w-72 space-y-2" role="status" aria-live="polite">
       {events.map((e) => (
         <div key={eventKey(e)} className="panel toast-in p-3">
-          <p className={`font-pixel text-[10px] ${e.xp > 0 ? 'text-amber-300' : 'text-slate-400'}`}>
+          <p className={`font-display font-bold tracking-wide text-[13px] ${e.xp > 0 ? 'text-amber-300' : 'text-slate-400'}`}>
             +{e.xp} XP
           </p>
           <p className="mt-1 text-xs text-slate-200">{e.text}</p>

@@ -1,10 +1,10 @@
 import type { Agent } from '../api/schemas';
-import { AgentSprite } from './AgentSprite';
+import { AgentAvatar } from './AgentAvatar';
 import { timeOf } from './status';
 import { StatusChip } from './StatusChip';
 
-/** One squad member standing on their pad, with a speech bubble of real report lines. */
-export function AgentTile({ agent, index }: { agent: Agent; index: number }) {
+/** One squad member's card: portrait, status, and a speech bubble of real report lines. */
+export function AgentTile({ agent }: { agent: Agent }) {
   const locked = agent.status === 'locked';
   return (
     <article
@@ -12,22 +12,16 @@ export function AgentTile({ agent, index }: { agent: Agent; index: number }) {
       aria-label={`${agent.name}${locked ? ' (locked)' : ''}`}
     >
       <div className="flex items-end gap-4">
-        <div className="relative flex shrink-0 flex-col items-center">
-          <AgentSprite agentId={agent.id} locked={locked} size={64} delay={index * 0.23} />
-          <div className="-mt-1 h-2 w-14 rounded-[50%] bg-black/60" aria-hidden="true" />
-          {locked && (
-            <span className="absolute top-5 font-pixel text-[14px] text-slate-400" aria-hidden="true">
-              ?
-            </span>
-          )}
+        <div className="shrink-0">
+          <AgentAvatar agentId={agent.id} locked={locked} size={64} />
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
-          <h3 className="font-pixel text-[11px] uppercase leading-relaxed text-slate-100">
+          <h3 className="font-display font-bold tracking-wide text-[14px] uppercase leading-relaxed text-slate-100">
             {agent.name}
           </h3>
           <StatusChip status={agent.status} />
           {!locked && (
-            <p className="font-pixel text-[8px] uppercase text-amber-300">
+            <p className="font-display font-bold tracking-wide text-[11px] uppercase text-amber-300">
               LV {agent.level} · {agent.xp} XP
             </p>
           )}
@@ -36,7 +30,7 @@ export function AgentTile({ agent, index }: { agent: Agent; index: number }) {
       <p className="mt-3 text-xs text-slate-400">{agent.role}</p>
 
       {locked ? (
-        <p className="mt-3 font-pixel text-[8px] uppercase leading-relaxed text-slate-500">
+        <p className="mt-3 font-display font-bold tracking-wide text-[11px] uppercase leading-relaxed text-slate-500">
           🔒 Unlocks in {agent.unlocks_in}
         </p>
       ) : (
@@ -60,7 +54,7 @@ export function AgentTile({ agent, index }: { agent: Agent; index: number }) {
           {agent.station && (
             <a
               href={`#${agent.station}`}
-              className="btn-pixel mt-4 inline-block self-start bg-sky-600 px-3 py-2 text-white hover:bg-sky-500"
+              className="btn-game mt-4 inline-block self-start bg-sky-600 px-3 py-2 text-white hover:bg-sky-500"
             >
               Enter station &gt;
             </a>

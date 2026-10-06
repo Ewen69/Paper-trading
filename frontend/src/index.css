@@ -1,114 +1,129 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-pixel: 'Press Start 2P', ui-monospace, monospace;
+  --font-display: 'Exo 2', ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
   color-scheme: dark;
 }
 
-/* Command-deck backdrop: deep navy, faint grid, a soft glow. Static, so it never distracts. */
+/* PS2-era backdrop: deep blue gradient with soft light blooms, no pixel grid. */
 body {
-  background-color: #050816;
+  background-color: #040720;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(56 189 248 / 0.12), transparent 60%),
-    linear-gradient(rgb(148 163 184 / 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(148 163 184 / 0.05) 1px, transparent 1px);
-  background-size:
-    auto,
-    32px 32px,
-    32px 32px;
+    radial-gradient(ellipse 70% 45% at 50% -5%, rgb(59 130 246 / 0.28), transparent 65%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgb(14 165 233 / 0.12), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 0% 80%, rgb(99 102 241 / 0.14), transparent 70%),
+    linear-gradient(180deg, #050a2b 0%, #030616 100%);
   background-attachment: fixed;
-}
-
-/* Faint CRT scanlines over everything; pointer-events none so it never blocks input. */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgb(0 0 0 / 0) 0,
-    rgb(0 0 0 / 0) 2px,
-    rgb(0 0 0 / 0.08) 3px
-  );
-  z-index: 50;
 }
 
 /* In the components layer so Tailwind utilities (e.g. border colors) can override them. */
 @layer components {
-/* Game window: hard edges, inset bevel, glowing corner brackets. */
-.panel {
-  position: relative;
-  border: 2px solid #1e293b;
-  background: linear-gradient(180deg, rgb(15 23 42 / 0.94), rgb(2 6 23 / 0.94));
-  box-shadow:
-    0 0 0 1px #000,
-    inset 0 0 0 1px rgb(148 163 184 / 0.08),
-    0 10px 30px rgb(0 0 0 / 0.45);
-}
-.panel::before,
-.panel::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-color: #38bdf8;
-  pointer-events: none;
-}
-.panel::before {
-  top: -2px;
-  left: -2px;
-  border-top: 2px solid;
-  border-left: 2px solid;
-}
-.panel::after {
-  bottom: -2px;
-  right: -2px;
-  border-bottom: 2px solid;
-  border-right: 2px solid;
-}
-
-/* Chunky arcade button. */
-.btn-pixel {
-  font-family: var(--font-pixel);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border-bottom: 4px solid rgb(0 0 0 / 0.45);
-  transition: transform 60ms;
-}
-.btn-pixel:active:not(:disabled) {
-  transform: translateY(2px);
-  border-bottom-width: 2px;
-}
-
-/* XP bar with stepped fill, like a game HUD. */
-.xp-bar {
-  background-image: repeating-linear-gradient(
-    90deg,
-    #facc15 0,
-    #facc15 6px,
-    #eab308 6px,
-    #eab308 8px
-  );
-}
-
-}
-
-@keyframes sprite-bob {
-  0%,
-  100% {
-    transform: translateY(0);
+  /* Glossy beveled window, like a PS2 menu panel. */
+  .panel {
+    position: relative;
+    border: 1px solid rgb(96 165 250 / 0.25);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0) 38%),
+      linear-gradient(180deg, rgb(15 30 80 / 0.88), rgb(4 9 34 / 0.92));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.12),
+      inset 0 -1px 0 rgb(0 0 0 / 0.5),
+      0 0 0 1px rgb(0 0 0 / 0.6),
+      0 12px 32px rgb(0 0 0 / 0.5),
+      0 0 24px rgb(56 189 248 / 0.06);
+    backdrop-filter: blur(6px);
   }
-  50% {
-    transform: translateY(-3px);
+
+  /* Gel button with a top highlight and a pressed state. */
+  .btn-game {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 8px;
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.25), rgb(255 255 255 / 0) 55%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.35),
+      inset 0 -2px 0 rgb(0 0 0 / 0.3),
+      0 4px 12px rgb(0 0 0 / 0.35);
+    transition:
+      transform 80ms,
+      filter 120ms;
   }
-}
-.sprite-idle {
-  animation: sprite-bob 1.4s steps(2, jump-none) infinite;
+  .btn-game:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+  .btn-game:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  /* Glowing XP bar. */
+  .xp-bar {
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f59e0b, #fde047);
+    box-shadow: 0 0 10px rgb(250 204 21 / 0.55);
+  }
+
+  /* Agent portraits: soft upscaling of a low-res 3D render. */
+  .avatar-3d {
+    border-radius: 8px;
+    background: radial-gradient(circle at 50% 30%, rgb(59 130 246 / 0.35), rgb(2 6 23 / 0.9));
+    box-shadow: inset 0 0 0 1px rgb(147 197 253 / 0.3);
+  }
+  .avatar-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    color: #e0f2fe;
+    background: linear-gradient(180deg, #1d4ed8, #0b1d4f);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
+  }
+
+  /* 3D HQ stage and the HTML name tags that float over it. */
+  .hq-stage {
+    border-radius: 12px;
+    border: 1px solid rgb(96 165 250 / 0.3);
+    box-shadow:
+      0 0 40px rgb(56 189 248 / 0.1),
+      inset 0 0 60px rgb(0 0 0 / 0.6);
+  }
+  .hq-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    cursor: grab;
+  }
+  .scene-tag {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 4px 10px;
+    border-radius: 8px;
+    text-align: center;
+    white-space: nowrap;
+    background: rgb(2 6 23 / 0.72);
+    border: 1px solid rgb(148 163 184 / 0.3);
+    pointer-events: none;
+    opacity: 0;
+  }
+  .scene-tag-active {
+    pointer-events: auto;
+    border-color: rgb(56 189 248 / 0.55);
+  }
+  .scene-tag-active:hover,
+  .scene-tag-active:focus-visible {
+    background: rgb(12 74 110 / 0.9);
+    outline: 2px solid #38bdf8;
+  }
 }
 
 @keyframes led-pulse {
@@ -117,21 +132,20 @@ body::after {
   }
 }
 .led-pulse {
-  animation: led-pulse 1s steps(2, jump-none) infinite;
+  animation: led-pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes toast-in {
   from {
-    transform: translateX(16px);
+    transform: translateY(-8px) scale(0.98);
     opacity: 0;
   }
 }
 .toast-in {
-  animation: toast-in 180ms ease-out;
+  animation: toast-in 200ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sprite-idle,
   .led-pulse,
   .toast-in {
     animation: none;

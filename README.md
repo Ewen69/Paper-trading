@@ -39,6 +39,14 @@ Details and a worked example: [`docs/OPTIONS.md`](docs/OPTIONS.md).
   buy-and-hold benchmark.
 - **Tests first:** 25 hand-computed mechanics tests on a synthetic CSV fixture, plus 10 engine
   scenarios and 6 service/API tests.
+- **PS2-style 3D look, replacing the pixel art.**
+  - HQ is a live three.js room: low-poly agents on glowing status pads, fog, and a slow
+    orbiting camera you can drag.
+  - Name tags are HTML links. Locked silhouettes wait in the wings and show their tags on
+    hover.
+  - Agent pictures across the app are 3D portraits; panels are glossy; the font is Exo 2.
+  - It falls back cleanly without WebGL and respects reduced motion. See
+    [`docs/GAME.md`](docs/GAME.md).
 
 ### Phase 2b limitations
 
