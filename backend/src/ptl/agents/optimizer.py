@@ -277,8 +277,8 @@ def run_search(  # noqa: PLR0912, PLR0913, PLR0915 - the search recipe, step by 
     if not s.cls.space() or budget <= 0:
         return None
 
-    def say(message: str, level: learning.Level = "info") -> None:
-        learning.log(conn, DAEMON, message, clock(), level)
+    def say(message: str, level: learning.Level = "info", kind: learning.Kind = "info") -> None:
+        learning.log(conn, DAEMON, message, clock(), level, kind=kind)
 
     say(
         f"Search {search_id}: {target.label}, seed {seed}. Budget: {budget} new in-sample "
@@ -325,7 +325,7 @@ def run_search(  # noqa: PLR0912, PLR0913, PLR0915 - the search recipe, step by 
         else:
             say(f"Gen {generation}: no candidate has {settings.optimizer_min_trades}+ trades yet.")
         if s.fresh >= budget:
-            say(f"Search {search_id}: trial budget reached for {target.label}.")
+            say(f"Search {search_id}: trial budget reached for {target.label}.", kind="budget")
             break
         # Next generation: two elites, then tournament children (crossover + mutation).
         pool = ranked or list(s.evaluated.values())
@@ -408,7 +408,10 @@ def run_search(  # noqa: PLR0912, PLR0913, PLR0915 - the search recipe, step by 
         reason=reason,
         curve=_curves(conn, target, candidate.params, calendar, clock),
     )
-    say(f"New Active Best ({target.asset}): {target.label} ({_fmt(candidate.params)}). {reason}")
+    say(
+        f"New Active Best ({target.asset}): {target.label} ({_fmt(candidate.params)}). {reason}",
+        kind="active_best",
+    )
     return best
 
 
@@ -450,6 +453,93 @@ def _curves(
             for p in points
         ]
     return out
+
+
+def revalidate_active_best(
+    conn: sqlite3.Connection,
+    *,
+    dataset_id: int,
+    settings: Settings,
+    calendar: MarketCalendar,
+    clock: Clock,
+) -> learning.ActiveBest | None:
+    """After new bars arrive, re-check the equity Active Best on the grown holdout window.
+
+    No search and no budget reset: the same parameters get ONE more counted out-of-sample run
+    on the fresh dataset, and the result (validated or not) is recorded as a new Active Best
+    row pointing at that dataset. In-sample results can't change (the holdout start is locked),
+    so searching again would only re-mine the same data.
+    """
+    best = learning.active_best(conn, "equity")
+    if best is None:
+        return None
+    ins = learning.trial_by_id(conn, best.in_sample_log_id)
+    if ins is None:
+        return None
+    report = eq.run(
+        conn,
+        eq.RunRequest(dataset_id, best.symbol, best.strategy, "out-of-sample", best.params),
+        calendar,
+        clock(),
+    )
+    logged = bt_repo.find_run(conn, best.symbol, best.strategy, best.params, "out-of-sample")
+    oos = learning.log_trial(
+        conn,
+        now=clock(),
+        search_id=best.search_id,
+        generation=0,
+        asset="equity",
+        strategy=best.strategy,
+        symbol=best.symbol,
+        dataset_id=dataset_id,
+        options_dataset_id=None,
+        params=best.params,
+        period="out-of-sample",
+        run_id=report.run_id,
+        reused=False,
+        summary=logged.summary if logged else {},
+        fitness=None,
+        verdict="re-validation look (counted)",
+        note=f"Holdout through {report.reality_check.window_end} after a data sync.",
+    )
+    min_oos = max(3, settings.optimizer_min_trades // 3)
+    validated = bool(
+        oos.trades is not None
+        and oos.trades >= min_oos
+        and oos.sharpe is not None
+        and oos.sharpe > 0
+    )
+    reason = (
+        f"Re-validated after new bars: out-of-sample Sharpe {_num(oos.sharpe)} over {oos.trades} "
+        f"trades through {report.reality_check.window_end} -> "
+        + (
+            "validated."
+            if validated
+            else f"NOT validated (needs {min_oos}+ trades and Sharpe > 0)."
+        )
+    )
+    target = Target("equity", best.strategy, best.symbol, dataset_id)
+    new = learning.record_active_best(
+        conn,
+        now=clock(),
+        search_id=best.search_id,
+        trial=ins,
+        oos=oos,
+        validated=validated,
+        reason=reason,
+        curve=_curves(conn, target, best.params, calendar, clock),
+        dataset_id=dataset_id,
+    )
+    learning.log(
+        conn,
+        DAEMON,
+        f"Active Best {best.strategy} on {best.symbol}: {reason} "
+        f"({bt_repo.run_counts(conn, best.symbol, best.strategy).oos_evaluations} holdout "
+        "evaluation(s) on this symbol so far; each one is counted).",
+        clock(),
+        kind="revalidation",
+    )
+    return new
 
 
 # ---- the daemon loop -----------------------------------------------------------------------
@@ -504,8 +594,10 @@ def run_daemon(  # noqa: PLR0913
                         conn,
                         DAEMON,
                         "Idle: every target has used its trial budget, or no symbol has "
-                        f"{MIN_SESSIONS}+ sessions of imported bars. Import new data to continue.",
+                        f"{MIN_SESSIONS}+ sessions of imported bars. New targets from the daily "
+                        "data sync are picked up automatically.",
                         clock(),
+                        kind="idle",
                     )
                     idle_logged = True
                 beat({"state": "idle", "counts": learning.trial_counts(conn)}, "idle")

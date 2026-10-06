@@ -774,6 +774,7 @@ export const logLineSchema = z.object({
   daemon: z.string(),
   level: z.enum(['info', 'warn', 'error']),
   message: z.string(),
+  kind: z.string().default('info'),
 });
 export type LogLine = z.infer<typeof logLineSchema>;
 
@@ -794,6 +795,17 @@ export const daemonSchema = z.object({
     budget: z.number().optional(),
     mode: z.string().optional(),
     last_outcome: z.string().optional(),
+    sync: z
+      .looseObject({
+        at: z.string().optional(),
+        target_session: z.string().optional(),
+        symbols: z.number().optional(),
+        added_bars: z.number().optional(),
+        current: z.boolean().optional(),
+        failures: z.array(z.string()).optional(),
+        off: z.string().optional(),
+      })
+      .optional(),
     account: z
       .looseObject({
         error: z.string().optional(),
@@ -803,6 +815,18 @@ export const daemonSchema = z.object({
         day_pnl: z.number().optional(),
         positions: z
           .array(z.object({ symbol: z.string(), qty: z.number(), market_value: z.number() }))
+          .optional(),
+        spreads: z
+          .array(
+            z.object({
+              label: z.string(),
+              contracts: z.number(),
+              credit: z.number(),
+              collateral: z.number(),
+              status: z.string(),
+              mode: z.string(),
+            }),
+          )
           .optional(),
         risk: z
           .array(z.object({ name: z.string(), used: z.number(), limit: z.number(), utilization: z.number() }))

@@ -124,9 +124,9 @@ After that it sends:
 ## Limitations
 
 - **Equity curves for the Active Best are equity-only.** Options Active Bests have no curve.
-  The paper runner is equity-only too.
-- **Bars must be current.** The runner refuses to trade on stale bars; you import them
-  yourself.
+  They are paper traded as multi-leg spreads (`docs/LIVE_OPS.md`).
+- **Bars must be current.** The runner refuses to trade on stale bars. With paper API keys,
+  the daily sync keeps them current (`docs/LIVE_OPS.md`).
 - **Fitness is plain in-sample Sharpe.** It's not deflated for the number of trials; the trial
   counts and the out-of-sample label are the guard.
 - **No supervision.** A daemon that crashes shows "no heartbeat" in the dashboard;

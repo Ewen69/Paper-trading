@@ -224,7 +224,7 @@ def test_runner_waits_for_a_validated_active_best(
     run_tick(runner_conn, settings, state, broker)
     assert broker.submitted == []
     messages = [x.message for x in learning.recent_log(runner_conn)]
-    assert "Waiting: the optimizer has no equity Active Best yet." in messages
+    assert "Waiting: the optimizer has no Active Best yet." in messages
     assert any("failed its out-of-sample check" in m for m in messages)
 
 

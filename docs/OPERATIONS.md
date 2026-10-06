@@ -15,6 +15,10 @@ The default screen: a dense, dark telemetry dashboard fed live by `/ws/telemetry
 | Auditor | flags and Graduation Gate progress | Auditor, Graduation Gate |
 | Manual controls | kill switch (reason required), data check, manual in-sample sweeps, one paper cycle (dry run by default) | REST API |
 
+**Toasts are reserved for major events** (see `docs/LIVE_OPS.md`). Trials and routine log
+lines only scroll through the terminal. The paper runner panel also shows open option spreads
+and the daily data sync status.
+
 **Missing data is labeled, never invented:**
 
 - A daemon that isn't running shows "not running" or "no heartbeat".

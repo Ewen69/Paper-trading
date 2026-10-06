@@ -28,6 +28,7 @@ from ptl.paper.broker import (
     DryRunBroker,
     Mode,
     OrderTicket,
+    SpreadTicket,
 )
 from ptl.paper.runner import (
     CycleRefusedError,
@@ -60,6 +61,7 @@ class FakeBroker:
         self._account = BrokerAccount(equity, last_equity, equity, "test broker")
         self._positions = positions or {}
         self.submitted: list[OrderTicket] = []
+        self.spreads: list[SpreadTicket] = []
         self.status = "accepted"
 
     @property
@@ -75,6 +77,10 @@ class FakeBroker:
     def submit(self, ticket: OrderTicket) -> BrokerOrder:
         self.submitted.append(ticket)
         return BrokerOrder(f"b-{len(self.submitted)}", "accepted", None, None)
+
+    def submit_spread(self, ticket: SpreadTicket) -> BrokerOrder:
+        self.spreads.append(ticket)
+        return BrokerOrder(f"s-{len(self.spreads)}", "accepted", None, None)
 
     def order_status(self, order_id: str) -> BrokerOrder:
         filled = self.status == "filled"

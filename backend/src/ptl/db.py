@@ -368,6 +368,36 @@ MIGRATIONS: tuple[str, ...] = (
     CREATE TRIGGER daemon_log_no_delete BEFORE DELETE ON daemon_log
     BEGIN SELECT RAISE(ABORT, 'the daemon log is append-only'); END;
     """,
+    # 9: event kinds on daemon log lines (the UI toasts only major kinds), and option spreads
+    # opened by the paper runner. A spread's status changes; its orders and fills stay in the
+    # append-only paper order tables.
+    """
+    ALTER TABLE daemon_log ADD COLUMN kind TEXT NOT NULL DEFAULT 'info';
+
+    CREATE TABLE paper_spreads (
+        id             INTEGER PRIMARY KEY,
+        created_at     TEXT NOT NULL,
+        runner_id      INTEGER REFERENCES paper_runners (id),
+        cycle_id       INTEGER NOT NULL REFERENCES paper_cycles (id),
+        mode           TEXT NOT NULL CHECK (mode IN ('dry_run', 'paper')),
+        underlying     TEXT NOT NULL,
+        expiration     TEXT NOT NULL,
+        option_type    TEXT NOT NULL CHECK (option_type IN ('call', 'put')),
+        short_symbol   TEXT NOT NULL,
+        long_symbol    TEXT NOT NULL,
+        short_strike   REAL NOT NULL,
+        long_strike    REAL NOT NULL,
+        contracts      INTEGER NOT NULL CHECK (contracts > 0),
+        credit         REAL NOT NULL,
+        collateral     REAL NOT NULL,
+        open_order_id  INTEGER NOT NULL REFERENCES paper_orders (id),
+        close_order_id INTEGER REFERENCES paper_orders (id),
+        status         TEXT NOT NULL CHECK (status IN ('open', 'closing', 'closed', 'void')),
+        closed_at      TEXT,
+        close_debit    REAL,
+        note           TEXT NOT NULL DEFAULT ''
+    );
+    """,
 )
 
 

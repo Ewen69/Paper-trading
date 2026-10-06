@@ -1,5 +1,8 @@
 """`python -m ptl.runner [--dry-run | --paper] [--once]` - the paper execution daemon.
 
+With paper API keys it also syncs daily equity bars and reads live option quotes (market data
+only; read-only). Without keys it runs equity dry runs on imported data.
+
 Dry run is the default. `--paper` sends orders to the Alpaca PAPER account (simulated money)
 and needs paper API keys in .env. There is no live-trading option.
 """
@@ -9,6 +12,8 @@ from datetime import UTC, datetime
 
 from ptl.config import Settings
 from ptl.data.alpaca_source import AlpacaQuoteSource
+from ptl.data.daily_sync import AlpacaDailyBars
+from ptl.data.option_chain import AlpacaOptionChain
 from ptl.paper.factory import broker_factory
 from ptl.paper.runner import CycleRefusedError
 from ptl.runner.daemon import run_daemon
@@ -28,8 +33,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}")  # noqa: T201 - CLI output
         return 2
     quotes = AlpacaQuoteSource(settings, lambda: datetime.now(UTC))
+    keyed = settings.broker_credentials_configured
+    bars = AlpacaDailyBars(settings) if keyed else None
+    chain = AlpacaOptionChain(settings) if keyed else None
     try:
-        run_daemon(settings, broker=broker, quotes=quotes, once=args.once)
+        run_daemon(settings, broker=broker, quotes=quotes, chain=chain, bars=bars, once=args.once)
     except KeyboardInterrupt:
         return 0
     return 0

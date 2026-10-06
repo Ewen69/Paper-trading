@@ -68,6 +68,7 @@ def log_event(line: learning.LogLine) -> dict[str, Any]:
         "daemon": line.daemon,
         "level": line.level,
         "message": line.message,
+        "kind": line.kind,
     }
 
 

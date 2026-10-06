@@ -97,8 +97,9 @@ npm run ptl -- paper-cycle ... --paper   # sends to the Alpaca PAPER account
 
 ## Limitations
 
-- **Options paper trading isn't built.** The paper runner is equity-only, and option
-  strategies are refused. Options are backtest-only for now.
+- **Single paper cycles are equity-only.** The manual "one paper cycle" control and
+  `paper-cycle` CLI refuse option strategies. Options are paper traded by the runner daemon
+  as multi-leg spreads (`docs/LIVE_OPS.md`).
 - **The agents aren't AI.** They're deterministic job runners. AI-backed agents with a Claude
   lead reviewer are a later phase.
 - **The runtime is single-process and in-memory.** Queued jobs don't survive a restart (stale

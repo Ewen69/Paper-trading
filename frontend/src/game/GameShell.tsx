@@ -5,6 +5,8 @@ import type { Agent, GameEvent, GameState } from '../api/schemas';
 import { useApi, type ApiState } from '../api/useApi';
 import { NetWorthPage } from '../networth/NetWorthPage';
 import { OpsCenter } from '../ops/OpsCenter';
+import { useTelemetry } from '../api/useTelemetry';
+import { addToast, expire, toastForLog, toastsForGameEvents, type ToastItem, type ToastTone } from './toasts';
 import { PortfolioPage } from '../portfolio/PortfolioPage';
 import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
@@ -157,35 +159,68 @@ function StationHeader({ agent }: { agent: Agent | undefined }) {
   );
 }
 
-function Toasts({ events, onDismiss }: { events: GameEvent[]; onDismiss: () => void }) {
-  useEffect(() => {
-    if (events.length === 0) return;
-    const timer = window.setTimeout(onDismiss, 6000);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [events, onDismiss]);
-  if (events.length === 0) return null;
+const TONE_CLASS: Record<ToastTone, string> = {
+  good: 'text-emerald-300',
+  info: 'text-sky-300',
+  warn: 'text-amber-300',
+  bad: 'text-rose-300',
+};
+
+function Toasts({ items }: { items: ToastItem[] }) {
+  if (items.length === 0) return null;
   return (
-    <div className="fixed right-4 top-24 z-50 w-72 space-y-2" role="status" aria-live="polite">
-      {events.map((e) => (
-        <div key={eventKey(e)} className="panel toast-in p-3">
-          <p className={`font-pixel text-[10px] ${e.xp > 0 ? 'text-amber-300' : 'text-slate-400'}`}>
-            +{e.xp} XP
+    <div className="fixed right-4 top-24 z-50 w-80 space-y-2" role="status" aria-live="polite">
+      {items.map((t) => (
+        <div key={t.id} className="panel toast-in p-3">
+          <p className={`font-pixel text-[10px] ${TONE_CLASS[t.tone]}`}>
+            {t.title}
+            {t.count > 1 && <span className="ml-2 text-slate-400">x{t.count}</span>}
           </p>
-          <p className="mt-1 text-xs text-slate-200">{e.text}</p>
-          {e.xp_note && <p className="mt-1 text-[11px] text-slate-500">{e.xp_note}</p>}
+          <p className="mt-1 line-clamp-3 text-xs text-slate-200">{t.text}</p>
         </div>
       ))}
     </div>
   );
 }
 
-export function GameShell() {
+export function GameShell({ telemetryUrlOverride }: { telemetryUrlOverride?: string } = {}) {
   const [station, setStation] = useState<StationId>(stationFromHash);
   const [game, reload] = useApi(fetchGameState);
-  const [toasts, setToasts] = useState<GameEvent[]>([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const seen = useRef<Set<string> | null>(null);
+  const telemetry = useTelemetry(telemetryUrlOverride);
+  const lastLogId = useRef<number | null>(null);
+
+  const push = useCallback((items: ToastItem[]) => {
+    if (items.length === 0) return;
+    setToasts((list) => items.reduce(addToast, list));
+  }, []);
+
+  // Toasts expire on their own; merged repeats extend their toast's life.
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timer = window.setInterval(() => {
+      setToasts((list) => expire(list, Date.now()));
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [toasts.length]);
+
+  // Only major telemetry events toast; trials and routine lines just scroll in the terminal.
+  // The backlog delivered on connect is never toasted.
+  useEffect(() => {
+    const lines = telemetry.feed.flatMap((i) => (i.kind === 'log' ? [i.line] : []));
+    const newest = lines.at(-1)?.id ?? 0;
+    if (lastLogId.current === null) {
+      if (telemetry.connection === 'live') lastLogId.current = newest;
+      return;
+    }
+    const since = lastLogId.current;
+    const now = Date.now();
+    push(lines.filter((l) => l.id > since).flatMap((l) => toastForLog(l, now) ?? []));
+    lastLogId.current = Math.max(since, newest);
+  }, [telemetry.feed, telemetry.connection, push]);
 
   // Follow the URL hash; refresh game state on every station change.
   useEffect(() => {
@@ -224,15 +259,11 @@ export function GameShell() {
     const keys = new Set(game.data.events.map(eventKey));
     if (seen.current) {
       const previous = seen.current;
-      const fresh = game.data.events.filter((e) => !previous.has(eventKey(e))).slice(0, 3);
-      if (fresh.length) setToasts(fresh);
+      const fresh = game.data.events.filter((e) => !previous.has(eventKey(e)));
+      push(toastsForGameEvents(fresh, Date.now()));
     }
     seen.current = keys;
-  }, [game]);
-
-  const dismiss = useCallback(() => {
-    setToasts([]);
-  }, []);
+  }, [game, push]);
 
   const agents = game.kind === 'ready' ? game.data.agents : [];
   const stationAgent = agents.find((a) => a.station === station);
@@ -243,7 +274,7 @@ export function GameShell() {
       <Hotbar current={station} agents={agents} />
       <main>
         {station === 'hq' && <HQPage game={game} />}
-        {station === 'ops' && <OpsCenter />}
+        {station === 'ops' && <OpsCenter view={telemetry} />}
         {station !== 'hq' && station !== 'ops' && <StationHeader agent={stationAgent} />}
         {station === 'data-health' && <DataHealthPage />}
         {station === 'strategy-lab' && <StrategyLabPage onActivity={announceActivity} />}
@@ -251,7 +282,7 @@ export function GameShell() {
         {station === 'net-worth' && <NetWorthPage />}
         {station === 'portfolio' && <PortfolioPage />}
       </main>
-      <Toasts events={toasts} onDismiss={dismiss} />
+      <Toasts items={toasts} />
     </div>
   );
 }

@@ -16,6 +16,23 @@ from ptl.backtest.repository import canonical_json
 
 Asset = Literal["equity", "options"]
 Level = Literal["info", "warn", "error"]
+# Event kinds. The UI raises a toast only for the major ones (see MAJOR_KINDS); everything else
+# just scrolls through the terminal.
+Kind = Literal[
+    "info",
+    "active_best",
+    "budget",
+    "idle",
+    "risk",
+    "kill_switch",
+    "data_sync",
+    "revalidation",
+    "order",
+    "error",
+]
+MAJOR_KINDS: frozenset[str] = frozenset(
+    {"active_best", "budget", "idle", "risk", "kill_switch", "data_sync", "revalidation", "order"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +87,7 @@ class LogLine:
     daemon: str
     level: Level
     message: str
+    kind: str = "info"
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +247,7 @@ def record_active_best(  # noqa: PLR0913
     validated: bool,
     reason: str,
     curve: dict[str, list[dict[str, Any]]],
+    dataset_id: int | None = None,
 ) -> ActiveBest:
     if trial.fitness is None:
         raise ValueError("Active Best needs an in-sample fitness.")
@@ -246,7 +265,7 @@ def record_active_best(  # noqa: PLR0913
                 trial.asset,
                 trial.strategy,
                 trial.symbol,
-                trial.dataset_id,
+                dataset_id if dataset_id is not None else trial.dataset_id,
                 trial.options_dataset_id,
                 canonical_json(trial.params),
                 trial.fitness,
@@ -283,13 +302,20 @@ def trial_by_id(conn: sqlite3.Connection, trial_id: int) -> Trial | None:
 # ---- daemon log and heartbeats ------------------------------------------------------------
 
 
-def log(
-    conn: sqlite3.Connection, daemon: str, message: str, now: datetime, level: Level = "info"
+def log(  # noqa: PLR0913
+    conn: sqlite3.Connection,
+    daemon: str,
+    message: str,
+    now: datetime,
+    level: Level = "info",
+    *,
+    kind: Kind = "info",
 ) -> None:
     with conn:
         conn.execute(
-            "INSERT INTO daemon_log (created_at, daemon, level, message) VALUES (?, ?, ?, ?)",
-            (now.isoformat(), daemon, level, message),
+            "INSERT INTO daemon_log (created_at, daemon, level, message, kind) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (now.isoformat(), daemon, level, message, kind),
         )
 
 
@@ -299,7 +325,12 @@ def log_after(conn: sqlite3.Connection, after_id: int, limit: int = 200) -> list
     )
     return [
         LogLine(
-            r["id"], datetime.fromisoformat(r["created_at"]), r["daemon"], r["level"], r["message"]
+            r["id"],
+            datetime.fromisoformat(r["created_at"]),
+            r["daemon"],
+            r["level"],
+            r["message"],
+            r["kind"],
         )
         for r in rows
     ]
@@ -309,7 +340,12 @@ def recent_log(conn: sqlite3.Connection, limit: int = 100) -> list[LogLine]:
     rows = list(conn.execute("SELECT * FROM daemon_log ORDER BY id DESC LIMIT ?", (limit,)))
     return [
         LogLine(
-            r["id"], datetime.fromisoformat(r["created_at"]), r["daemon"], r["level"], r["message"]
+            r["id"],
+            datetime.fromisoformat(r["created_at"]),
+            r["daemon"],
+            r["level"],
+            r["message"],
+            r["kind"],
         )
         for r in reversed(rows)
     ]

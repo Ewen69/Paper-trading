@@ -1,5 +1,6 @@
 """Application settings, read from environment variables and the repo-root `.env` file."""
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -68,6 +69,15 @@ class Settings(BaseSettings):
     optimizer_idle_seconds: float = Field(default=60.0, gt=0)
     # Paper runner daemon: how often it wakes up to check for a new session.
     runner_poll_seconds: float = Field(default=60.0, gt=0)
+    # Daily equity bar sync from Alpaca market data (runs inside the runner daemon).
+    sync_enabled: bool = True
+    sync_backfill_start: date = date(2016, 1, 4)
+    sync_delay_minutes: int = Field(default=20, ge=0)  # after the close, before fetching
+    sync_retry_minutes: int = Field(default=15, ge=1)
+    sync_max_symbols: int = Field(default=40, ge=1, le=500)
+    # Options paper execution.
+    options_close_days_before_expiry: int = Field(default=1, ge=0)
+    options_commission_per_contract: float = Field(default=0.65, ge=0)
 
     @field_validator("database_path")
     @classmethod
