@@ -95,3 +95,143 @@ export const quoteSchema = z.object({
   issues: z.array(issueSchema),
 });
 export type Quote = z.infer<typeof quoteSchema>;
+
+// ---- Backtesting (Strategy Lab) ----
+
+const intervalSchema = z.object({ low: z.number(), high: z.number() }).nullable();
+const estimateSchema = z.object({ value: z.number().nullable(), ci95: intervalSchema });
+export type Estimate = z.infer<typeof estimateSchema>;
+
+export const strategySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  params: z.array(
+    z.object({
+      name: z.string(),
+      label: z.string(),
+      default: z.number().int(),
+      minimum: z.number().int(),
+      maximum: z.number().int(),
+      description: z.string(),
+    }),
+  ),
+});
+export type Strategy = z.infer<typeof strategySchema>;
+export const strategiesSchema = z.array(strategySchema);
+
+const lockSchema = z.object({
+  symbol: z.string(),
+  oos_start: isoDate,
+  oos_fraction: z.number(),
+  locked_at: isoDateTime,
+  basis: z.string(),
+});
+
+export const universeSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  entries: z.array(
+    z.object({
+      dataset_id: z.number().int(),
+      symbol: z.string(),
+      source: z.string(),
+      file_name: z.string(),
+      first_date: isoDate,
+      last_date: isoDate,
+      sessions: z.number().int(),
+      has_adj_close: z.boolean(),
+      lock: lockSchema.nullable(),
+      in_sample_runs: z.number().int(),
+      oos_evaluations: z.number().int(),
+    }),
+  ),
+});
+export type Universe = z.infer<typeof universeSchema>;
+export type UniverseEntry = Universe['entries'][number];
+
+const performanceSchema = z.object({
+  sessions: z.number().int(),
+  final_equity: z.number(),
+  total_return: z.number(),
+  annualized_return: estimateSchema,
+  annual_volatility: z.number().nullable(),
+  sharpe: estimateSchema,
+  max_drawdown: z.number(),
+  max_drawdown_date: isoDate.nullable(),
+  exposure: z.number(),
+  trade_count: z.number().int(),
+  win_rate: estimateSchema,
+  expectancy: estimateSchema,
+  avg_win: z.number().nullable(),
+  avg_loss: z.number().nullable(),
+  total_costs: z.number(),
+});
+export type Performance = z.infer<typeof performanceSchema>;
+
+const periodSchema = z.enum(['in-sample', 'out-of-sample']);
+export type Period = z.infer<typeof periodSchema>;
+
+export const realityCheckSchema = z.object({
+  period: periodSchema,
+  window_start: isoDate,
+  window_end: isoDate,
+  sessions: z.number().int(),
+  trade_count: z.number().int(),
+  parameter_combinations_tried: z.number().int(),
+  parameter_combinations_tried_all_strategies: z.number().int(),
+  in_sample_runs: z.number().int(),
+  oos_evaluations: z.number().int(),
+  oos_start: isoDate,
+  oos_locked_at: isoDateTime,
+  oos_lock_basis: z.string(),
+  costs: z.object({
+    slippage_bps: z.number(),
+    commission_per_order: z.number(),
+    commission_bps: z.number(),
+  }),
+  initial_capital: z.number(),
+  price_basis: z.enum(['adjusted', 'raw']),
+  benchmark_price_basis: z.enum(['adjusted', 'raw']),
+  fill_model: z.string(),
+  cash_yield: z.string(),
+  sharpe_risk_free: z.string(),
+  bootstrap: z.object({
+    method: z.string(),
+    resamples: z.number().int(),
+    block_length: z.number().int(),
+    seed: z.number().int(),
+    confidence: z.number(),
+  }),
+  warnings: z.array(z.string()),
+});
+export type RealityCheck = z.infer<typeof realityCheckSchema>;
+
+export const reportSchema = z.object({
+  run_id: z.number().int(),
+  symbol: z.string(),
+  benchmark_symbol: z.string(),
+  strategy: z.object({ id: z.string(), name: z.string(), params: z.record(z.string(), z.number()) }),
+  strategy_metrics: performanceSchema,
+  benchmark_metrics: performanceSchema,
+  excess_annualized_return: estimateSchema,
+  curve: z.array(
+    z.object({ day: isoDate, strategy: z.number().nullable(), benchmark: z.number().nullable() }),
+  ),
+  trades: z.array(
+    z.object({
+      entry_date: isoDate,
+      exit_date: isoDate,
+      cash_out: z.number(),
+      cash_in: z.number(),
+      pnl: z.number(),
+      return_pct: z.number(),
+      sessions_held: z.number().int(),
+      exit_reason: z.string(),
+    }),
+  ),
+  reality_check: realityCheckSchema,
+  provenance: provenanceSchema,
+  benchmark_provenance: provenanceSchema,
+});
+export type Report = z.infer<typeof reportSchema>;

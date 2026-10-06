@@ -108,7 +108,9 @@ def _describe_error(exc: Exception) -> str:
     if isinstance(exc, APIError):
         status = exc.status_code
         if status in (401, 403):
-            return f"Alpaca rejected the credentials or the feed is not in your plan (HTTP {status})."
+            return (
+                f"Alpaca rejected the credentials or the feed is not in your plan (HTTP {status})."
+            )
         return f"Alpaca API error (HTTP {status})."
     return f"Could not reach Alpaca ({type(exc).__name__})."
 
@@ -205,9 +207,7 @@ class AlpacaQuoteSource:
         return self._cached_status
 
     def _check(self, now: datetime) -> SourceStatus:
-        def status(
-            reachable: bool | None, account: str | None, error: str | None
-        ) -> SourceStatus:
+        def status(reachable: bool | None, account: str | None, error: str | None) -> SourceStatus:
             return SourceStatus(
                 name=self.name,
                 configured=self._configured,

@@ -10,7 +10,7 @@
     "dev:web": "npm run dev --prefix frontend",
     "ptl": "uv run --project backend ptl",
     "check": "npm run check:api && npm run check:web",
-    "check:api": "uv --directory backend run ruff check . && uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
+    "check:api": "uv --directory backend run ruff check --no-cache . &&uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
     "check:web": "npm run typecheck --prefix frontend && npm run lint --prefix frontend && npm run test --prefix frontend"
   },
   "devDependencies": {

@@ -60,6 +60,21 @@ and trial counter introduced here.
 (ITM/OTM settlement), assignment, and early-exercise handling (configurable policy, e.g. short
 ITM call before ex-div). Hand-computed CSV fixtures drive unit tests for fills, expiry, assignment.
 
+**Phase 2.5 — Game UI (agents).** Added 2026-10-05 at the user's request; it pulls the visual
+part of Phase 6 forward. The UI becomes game-like rather than a web page. Each "agent" character
+is bound to a real module: Data Scout → data layer, Backtester → engine, Risk Officer → risk
+module, and so on. An agent's status, XP and messages come only from that module's real outputs.
+No AI calls in this phase.
+
+**Later — AI-backed agents.** Agents can be powered by Claude (Anthropic API), local models
+(Ollama), OpenAI GPT, or Google Gemini. Every agent reports to a Claude "lead" that is the final
+reviewer. Rules for this:
+- Agents may only cite numbers the app computed. The reviewer rejects any claim it can't trace
+  to one.
+- No advice and no "expected profit" language.
+- Net-worth data never goes to a cloud model unless the user explicitly opts in.
+- API keys live in `.env`.
+
 **Phase 3 — Strategy interface & paper runner.** Strategy plugin protocol + registry.
 Risk module (max loss/trade, max loss/day, max open positions, max capital at risk, kill switch,
 defined-risk-only validator that rejects naked short options). Paper runner using

@@ -24,7 +24,7 @@ def _age(seconds: float) -> str:
     return f"{seconds / 3600:.1f} h"
 
 
-def live_quote_staleness(  # noqa: PLR0913
+def live_quote_staleness(  # noqa: PLR0913, PLR0917
     timestamp: datetime,
     data_type: DataType,
     now: datetime,

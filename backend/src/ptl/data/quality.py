@@ -10,6 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from itertools import pairwise
 
 from ptl.data.models import EquityBar, LiveQuote, OptionQuote, QualityIssue, Severity
 from ptl.market_calendar import MarketCalendar
@@ -33,7 +34,7 @@ class _Finding:
 class _Collector:
     findings: dict[tuple[str, str], _Finding] = field(default_factory=dict)
 
-    def add(  # noqa: PLR0913 - one call site per check; keyword args keep them readable
+    def add(  # noqa: PLR0913, PLR0917 - one call per check; explicit args read best
         self,
         check: str,
         severity: Severity,
@@ -114,7 +115,11 @@ def _check_missing_sessions(
         f"{r[0]}" if len(r) == 1 else f"{r[0]}..{r[-1]} ({len(r)})"
         for r in runs[:_MAX_RANGES_IN_DETAIL]
     )
-    more = f" and {len(runs) - _MAX_RANGES_IN_DETAIL} more gaps" if len(runs) > 3 else ""
+    more = (
+        f" and {len(runs) - _MAX_RANGES_IN_DETAIL} more gaps"
+        if len(runs) > _MAX_RANGES_IN_DETAIL
+        else ""
+    )
     c.add(
         "missing_sessions",
         Severity.WARNING,
@@ -131,7 +136,9 @@ def check_equity_bars(bars: Sequence[EquityBar], cal: MarketCalendar) -> list[Qu
     c = _Collector()
     if not bars:
         return []
-    all_sessions = cal.sessions(min(b.session_date for b in bars), max(b.session_date for b in bars))
+    all_sessions = cal.sessions(
+        min(b.session_date for b in bars), max(b.session_date for b in bars)
+    )
     session_set = set(all_sessions)
 
     by_symbol: dict[str, list[EquityBar]] = defaultdict(list)
@@ -185,11 +192,15 @@ def check_equity_bars(bars: Sequence[EquityBar], cal: MarketCalendar) -> list[Qu
     return c.issues()
 
 
-def check_option_quotes(quotes: Sequence[OptionQuote], cal: MarketCalendar) -> list[QualityIssue]:  # noqa: C901, PLR0912 - flat list of independent checks
+def check_option_quotes(  # noqa: PLR0912 - flat list of independent checks
+    quotes: Sequence[OptionQuote], cal: MarketCalendar
+) -> list[QualityIssue]:
     c = _Collector()
     if not quotes:
         return []
-    all_sessions = cal.sessions(min(q.quote_date for q in quotes), max(q.quote_date for q in quotes))
+    all_sessions = cal.sessions(
+        min(q.quote_date for q in quotes), max(q.quote_date for q in quotes)
+    )
     session_set = set(all_sessions)
 
     by_contract: dict[tuple[str, str, date, float, str], list[OptionQuote]] = defaultdict(list)
@@ -246,9 +257,7 @@ def check_option_quotes(quotes: Sequence[OptionQuote], cal: MarketCalendar) -> l
                 label,
             )
         if q.strike <= 0:
-            c.add(
-                "non_positive_strike", Severity.ERROR, s, d, "Strike is zero or negative.", label
-            )
+            c.add("non_positive_strike", Severity.ERROR, s, d, "Strike is zero or negative.", label)
         if q.quote_date > q.expiration:
             c.add(
                 "quote_after_expiration",
@@ -271,7 +280,7 @@ def check_option_quotes(quotes: Sequence[OptionQuote], cal: MarketCalendar) -> l
     for key, rows in by_contract.items():
         rows.sort(key=lambda q: q.quote_date)
         run = 1
-        for prev, cur in zip(rows, rows[1:], strict=False):
+        for prev, cur in pairwise(rows):
             same = cur.bid == prev.bid and cur.ask == prev.ask and cur.ask > 0
             run = run + 1 if same else 1
             if run == REPEATED_QUOTE_RUN:

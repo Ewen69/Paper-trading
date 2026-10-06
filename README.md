@@ -6,9 +6,56 @@ Alpaca's **paper** account, and local net-worth / portfolio tracking.
 
 > Nothing in this app is financial advice. It reports computed numbers and their assumptions.
 
-## Status: Phase 1 (data layer)
+## Status: Phase 2a (core backtester)
 
-### What Phase 1 adds
+Next: a game-style UI with agent characters (Phase 2.5), then options backtesting (2b). See
+[`docs/PLAN.md`](docs/PLAN.md).
+
+### What Phase 2a adds
+
+How it works in detail: [`docs/BACKTESTING.md`](docs/BACKTESTING.md).
+
+- **Event-driven engine (stocks/ETFs):**
+  - decisions at the close, fills at the next open
+  - slippage and commission on every fill
+  - fractional shares, long only
+  - forced exit at the end so every result is after costs
+  - strategies see history only up to the decision day; a test proves future prices can't
+    change past decisions
+- **Strategies:** buy-and-hold (the benchmark) and a moving-average crossover.
+- **Benchmark on every run:** buy-and-hold over the same window with the same costs.
+- **Metrics:** total and annualized return, volatility, Sharpe, max drawdown, time in market,
+  trade count, win rate, and expectancy (historical average P&L per trade).
+  - 95% bootstrap confidence intervals, including a paired CI for excess return vs the
+    benchmark.
+- **Locked out-of-sample period:** the first run on a symbol permanently reserves its most
+  recent 30% of sessions.
+  - In-sample runs never receive those bars.
+  - Every out-of-sample look is counted.
+- **Trial counting:** every run is logged in an append-only table. The number of parameter
+  combinations you've tried is shown next to every result.
+- **Strategy Lab page:** run backtests and see an equity chart (hover or arrow keys, plus a
+  table view), the metrics with CIs, the trades, and a **Reality Check** panel listing:
+  - sample size and the CI on excess return
+  - trial count and out-of-sample looks
+  - costs, price basis and cash yield
+  - automatic warnings
+- **Blocked runs:** error-level data problems, too little data, or benchmark data that
+  doesn't cover the window stop a run with a clear reason.
+
+### Phase 2a limitations
+
+- **No market data is included.** Import a daily CSV first (ideally with `adj_close`). Without
+  `adj_close`, dividends are excluded and the report says so.
+- Daily bars, one asset, long only. Options come in Phase 2b; parameter sweeps aren't built
+  yet.
+- Slippage is a flat number of basis points. Gaps, halts and spreads widening under stress
+  aren't modeled.
+- Idle cash earns 0%, which understates strategies that are often in cash. This is stated
+  in every report.
+- Trial counts only cover experiments run inside this app.
+
+### What Phase 1 added
 
 Details: [`docs/DATA.md`](docs/DATA.md).
 

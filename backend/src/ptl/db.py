@@ -73,6 +73,41 @@ MIGRATIONS: tuple[str, ...] = (
     );
     CREATE INDEX quality_issues_dataset ON quality_issues (dataset_id);
     """,
+    # 2: backtesting rigor. Out-of-sample locks are per symbol (across all datasets) and the run
+    # log is append-only, so trial counts can't be reset by deleting or re-importing data.
+    """
+    CREATE TABLE oos_locks (
+        symbol       TEXT PRIMARY KEY,
+        oos_start    TEXT NOT NULL,
+        oos_fraction REAL NOT NULL,
+        locked_at    TEXT NOT NULL,
+        basis        TEXT NOT NULL
+    );
+    CREATE TRIGGER oos_locks_no_update BEFORE UPDATE ON oos_locks
+    BEGIN SELECT RAISE(ABORT, 'out-of-sample locks are permanent'); END;
+    CREATE TRIGGER oos_locks_no_delete BEFORE DELETE ON oos_locks
+    BEGIN SELECT RAISE(ABORT, 'out-of-sample locks are permanent'); END;
+
+    CREATE TABLE backtest_runs (
+        id               INTEGER PRIMARY KEY,
+        created_at       TEXT NOT NULL,
+        symbol           TEXT NOT NULL,
+        period           TEXT NOT NULL CHECK (period IN ('in-sample', 'out-of-sample')),
+        strategy         TEXT NOT NULL,
+        params           TEXT NOT NULL,
+        costs            TEXT NOT NULL,
+        dataset_sha256   TEXT NOT NULL,
+        window_start     TEXT NOT NULL,
+        window_end       TEXT NOT NULL,
+        benchmark_symbol TEXT NOT NULL,
+        summary          TEXT NOT NULL
+    );
+    CREATE INDEX backtest_runs_symbol ON backtest_runs (symbol, period);
+    CREATE TRIGGER backtest_runs_no_update BEFORE UPDATE ON backtest_runs
+    BEGIN SELECT RAISE(ABORT, 'the backtest run log is append-only'); END;
+    CREATE TRIGGER backtest_runs_no_delete BEFORE DELETE ON backtest_runs
+    BEGIN SELECT RAISE(ABORT, 'the backtest run log is append-only'); END;
+    """,
 )
 
 

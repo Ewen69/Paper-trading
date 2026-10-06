@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from fastapi import FastAPI
 
 from ptl import __version__
+from ptl.backtest_api import build_backtest_router
 from ptl.config import Settings
 from ptl.data.alpaca_source import AlpacaQuoteSource
 from ptl.data.live import Clock, QuoteSource
@@ -51,14 +52,16 @@ def create_app(
         version = migrate(conn)
     logger.info("Database ready at %s (schema v%d)", settings.database_path, version)
 
+    calendar = calendar if calendar is not None else MarketCalendar()
     app = FastAPI(title="Paper Trading Lab", version=__version__)
     app.include_router(build_health_router(settings, paper_base_url))
     app.include_router(
         build_data_router(
             settings,
             quote_source if quote_source is not None else AlpacaQuoteSource(settings, clock),
-            calendar if calendar is not None else MarketCalendar(),
+            calendar,
             clock,
         )
     )
+    app.include_router(build_backtest_router(settings, calendar, clock))
     return app

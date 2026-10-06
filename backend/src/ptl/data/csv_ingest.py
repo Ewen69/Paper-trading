@@ -8,13 +8,13 @@ flagged for the backtester to respect.
 
 import csv
 import hashlib
+import math
 import re
 import sqlite3
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import astuple, dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import TypeVar
 
 from ptl.data import repository
 from ptl.data.models import (
@@ -62,8 +62,6 @@ OPTION_OPTIONAL = (
     "vega",
 )
 
-T = TypeVar("T")
-
 
 class ImportRejectedError(Exception):
     def __init__(self, errors: list[str], total_errors: int | None = None) -> None:
@@ -102,7 +100,7 @@ class _Row:
             raise _FieldError(f"{name} is empty")
         return value
 
-    def _parse(self, name: str, raw: str, parse: Callable[[str], T], kind: str) -> T:
+    def _parse[T](self, name: str, raw: str, parse: Callable[[str], T], kind: str) -> T:
         try:
             return parse(raw)
         except ValueError:
@@ -116,7 +114,7 @@ class _Row:
 
     def number(self, name: str) -> float:
         value = self._parse(name, self._required(name), float, "number")
-        if value != value or value in (float("inf"), float("-inf")):
+        if not math.isfinite(value):
             raise _FieldError(f"{name} is not finite")
         return value
 
@@ -135,7 +133,10 @@ class _Row:
     def day(self, name: str) -> date:
         raw = self._required(name)
         return self._parse(
-            name, raw, lambda v: datetime.strptime(v, self._date_format).date(), "date"
+            name,
+            raw,
+            lambda v: datetime.strptime(v, self._date_format).replace(tzinfo=UTC).date(),
+            "date",
         )
 
     def option_type(self, name: str) -> OptionType:
@@ -191,7 +192,7 @@ def _rows(
             yield reader.line_num, _Row(dict(zip(names, values, strict=False)), date_format)
 
 
-def _collect(
+def _collect[T](
     rows: Iterator[tuple[int, _Row]],
     build: Callable[[_Row], T],
     key: Callable[[T], tuple[object, ...]],
@@ -277,7 +278,7 @@ def parse_option_quotes(
     return _collect(rows, build, lambda q: (*q.contract_key, q.quote_date))
 
 
-def import_csv(  # noqa: PLR0913
+def import_csv(  # noqa: PLR0913, PLR0917
     conn: sqlite3.Connection,
     path: Path,
     kind: DatasetKind,
@@ -309,7 +310,7 @@ def import_csv(  # noqa: PLR0913
         bars = parse_equity_bars(path, column_map, date_format)
         issues = check_equity_bars(bars, calendar)
         keys = [(b.symbol, b.session_date) for b in bars]
-        sql = f"INSERT INTO equity_bars VALUES ({', '.join('?' * 9)})"
+        sql = "INSERT INTO equity_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         values = [_storable(astuple(b)) for b in bars]
     else:
         quotes = parse_option_quotes(path, column_map, date_format)
@@ -320,7 +321,7 @@ def import_csv(  # noqa: PLR0913
             "INSERT INTO option_quotes (dataset_id, underlying, quote_date, expiration, strike, "
             "option_type, bid, ask, root, exercise_style, bid_size, ask_size, last, volume, "
             "open_interest, underlying_price, implied_volatility, delta, gamma, theta, vega) "
-            f"VALUES ({', '.join('?' * 21)})"
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         values = [_storable(astuple(q)) for q in quotes]
 
