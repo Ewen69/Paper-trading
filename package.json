@@ -1,0 +1,18 @@
+{
+  "name": "paper-trading-lab",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Local paper-trading research lab. Paper trading only; never trades real money.",
+  "scripts": {
+    "postinstall": "uv --directory backend sync && npm install --prefix frontend --no-fund --no-audit",
+    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "uv --directory backend run uvicorn ptl.app:create_app --factory --host 127.0.0.1 --port 8000 --reload --reload-dir src",
+    "dev:web": "npm run dev --prefix frontend",
+    "check": "npm run check:api && npm run check:web",
+    "check:api": "uv --directory backend run ruff check . && uv --directory backend run ruff format --check . && uv --directory backend run mypy && uv --directory backend run pytest -q",
+    "check:web": "npm run typecheck --prefix frontend && npm run lint --prefix frontend && npm run test --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

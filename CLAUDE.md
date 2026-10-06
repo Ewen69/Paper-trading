@@ -1,0 +1,59 @@
+# CLAUDE.md — Paper Trading Lab
+
+Learning and research tool: options strategy research, honest backtesting, paper trading,
+net-worth and portfolio tracking. **It must never place real-money trades.**
+Architecture and phase plan: [`docs/PLAN.md`](docs/PLAN.md).
+
+## Execution protocol
+
+- Work one phase at a time. At the end of each phase: run `npm run check`, summarize what works
+  and what fails, update the README, commit, then **stop entirely**. Do not start the next
+  phase without explicit written approval from the user. Never chain phases.
+
+## Non-negotiable rules
+
+1. **Paper only.** Use the broker's paper endpoint only (`https://paper-api.alpaca.markets`).
+   `ptl.safety.assert_paper_endpoint` runs at startup and the app refuses to run otherwise.
+   Never write any code path that submits live orders. Any broker client must be constructed in
+   paper mode and re-check the endpoint before sending an order.
+2. **Real data only.** No fabricated, random, or mock data in any code path the UI reads from.
+   Mocks are allowed only inside tests. If data is missing, show "no data", never a guess.
+3. **Data provenance.** Store and display source, as-of timestamp, and data type (real-time,
+   delayed, end-of-day, manual entry). Flag stale data.
+4. **Honest backtesting.** No look-ahead: signals use only data available at that time. Fill
+   options at bid/ask with a configurable slippage model and per-contract commission, never at
+   mid or last. Handle expiration, assignment, and early exercise explicitly.
+5. **Scientific rigor.** Keep a locked out-of-sample period that tuning never touches. Count
+   every parameter combination tried and display that count next to results. Report bootstrap
+   confidence intervals, warn on low trade counts, and always compare to a buy-and-hold index
+   benchmark after costs.
+6. **Risk limits are code.** Max loss per trade, max loss per day, max open positions, max total
+   capital at risk, and a hard kill switch. Defined-risk strategies only (e.g. vertical spreads).
+   No naked short options.
+7. **Secrets & privacy.** Keys live in `.env` (gitignored) and are typed as `SecretStr`. Never
+   log or commit keys. Net-worth data stays local in SQLite. No bank logins: manual entry and
+   CSV import only.
+8. **Honesty over hype.** No advice, tips, or claims that can't be traced to computed numbers.
+   No "guaranteed" or "expected profit" language.
+
+## Stack and conventions
+
+- Backend: Python 3.12 (uv-managed, `backend/`), FastAPI, SQLite, pytest, mypy `--strict`, ruff.
+  Package lives at `backend/src/ptl/`. Timestamps are always timezone-aware UTC.
+- Frontend: React + Vite + TypeScript (strict) + Tailwind, ESLint `strictTypeChecked`, Vitest.
+  The frontend calls the backend via `/api/*` (Vite proxy strips `/api`).
+- Live data sources sit behind interfaces so they can be swapped. Historical data comes from
+  local CSV ingestion (Alpaca does not serve free historical options data).
+
+## Commands (run from repo root)
+
+- `npm install` — first-time setup (installs root tools, runs `uv sync` and frontend install).
+- `npm run dev` — start backend (:8000) and frontend (:5173) together.
+- `npm run check` — ruff, ruff format check, mypy, pytest, ESLint, tsc, Vitest. Must be clean
+  (zero warnings) before any commit.
+
+## Definition of done (per phase)
+
+Tests pass; the app runs locally with one command; every displayed number shows its source and
+timestamp; no type-checker or linter warnings; README explains what the phase does and its
+limitations.
