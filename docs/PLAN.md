@@ -81,7 +81,7 @@ defined-risk-only validator that rejects naked short options). Paper runner usin
 `alpaca-py` `TradingClient(paper=True)` with a second paper-URL assertion; audit log of every
 order, fill, rejection, and the reason. Dry-run mode that logs intended orders without sending.
 
-**Phase 4 — Net worth tracker.** SQLite schema for accounts, assets, liabilities, and dated
+**Phase 4 — Net worth tracker.** *(Done: see `docs/NETWORTH.md`.)* SQLite schema for accounts, assets, liabilities, and dated
 snapshots. Manual entry and CSV import/export. Net worth = assets − liabilities, history chart.
 Projections as a scenario range (defaults 4%–6% nominal), clearly labeled as assumptions.
 

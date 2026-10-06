@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     agents_poll_seconds: float = Field(default=30.0, gt=0)
     agents_max_combinations: int = Field(default=50, ge=1)
     paper_dry_run_capital: float = Field(default=100_000.0, gt=0)
+    # Net worth: a balance older than this many days is flagged stale.
+    networth_stale_after_days: int = Field(default=45, ge=1)
 
     @field_validator("database_path")
     @classmethod

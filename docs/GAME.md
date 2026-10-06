@@ -107,6 +107,8 @@ Badges:
 - Agents restate computed facts; they are not AI yet. See the plan for AI-backed agents.
 - The paper-trading gate items stay "not started" until the Alpaca paper account has fills.
   Dry runs never count.
+- The Accountant reports net-worth account counts, the latest entry date and stale accounts,
+  never amounts.
 - Risk Officer and Paper Trader report on HQ. Their live status and controls are in the City
   (`docs/AGENTS.md`).
 - Runs logged before this phase have no stored warnings or CIs. The Auditor and the gate treat

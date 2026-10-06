@@ -1,6 +1,11 @@
 import type { z } from 'zod';
 
 import {
+  balanceSchema,
+  netWorthImportSchema,
+  netWorthAccountSchema,
+  netWorthSchema,
+  projectionSchema,
   dataHealthSchema,
   gameStateSchema,
   jobSchema,
@@ -149,3 +154,51 @@ export const fetchPaperLog = (signal?: AbortSignal) =>
 /** ws:// URL for the live activity stream, through the Vite proxy. */
 export const activityUrl = () =>
   `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/ws/activity`;
+
+// ---- Net worth ----
+
+async function deleteJson(path: string): Promise<void> {
+  const response = await fetch(`/api${path}`, { method: 'DELETE' });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const detail =
+      typeof body === 'object' && body !== null && 'detail' in body && typeof body.detail === 'string'
+        ? body.detail
+        : `HTTP ${String(response.status)}`;
+    throw new Error(detail);
+  }
+}
+
+export const fetchNetWorth = (signal?: AbortSignal) => getJson('/networth', netWorthSchema, signal);
+
+export const createAccount = (body: { name: string; kind: string; category: string; note: string }) =>
+  postJson('/networth/accounts', body, netWorthAccountSchema);
+
+export const deleteAccount = (id: number) => deleteJson(`/networth/accounts/${String(id)}`);
+
+export const addBalance = (body: { account_id: number; as_of: string; amount: number }) =>
+  postJson('/networth/balances', body, balanceSchema);
+
+export const fetchBalances = (accountId: number, signal?: AbortSignal) =>
+  getJson(`/networth/accounts/${String(accountId)}/balances`, balanceSchema.array(), signal);
+
+export const deleteBalance = (id: number) => deleteJson(`/networth/balances/${String(id)}`);
+
+export const importNetWorth = (fileName: string, content: string) =>
+  postJson('/networth/import', { file_name: fileName, content }, netWorthImportSchema);
+
+/** Plain link target; the browser downloads the CSV. */
+export const netWorthExportUrl = '/api/networth/export';
+
+export const fetchProjection = (
+  params: { years: number; low: number; high: number; contribution: number },
+  signal?: AbortSignal,
+) => {
+  const query = new URLSearchParams({
+    years: String(params.years),
+    low: String(params.low),
+    high: String(params.high),
+    contribution: String(params.contribution),
+  });
+  return getJson(`/networth/projection?${query.toString()}`, projectionSchema, signal);
+};

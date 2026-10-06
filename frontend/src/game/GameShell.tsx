@@ -4,6 +4,7 @@ import { fetchGameState } from '../api/client';
 import type { Agent, GameEvent, GameState } from '../api/schemas';
 import { useApi, type ApiState } from '../api/useApi';
 import { CityPage } from '../city/CityPage';
+import { NetWorthPage } from '../networth/NetWorthPage';
 import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
 import { ACTIVITY_EVENT, announceActivity } from './activity';
@@ -19,6 +20,7 @@ const STATIONS = [
   { id: 'data-health', key: '3', label: 'Data Scout', agent: 'scout', icon: null },
   { id: 'strategy-lab', key: '4', label: 'Quant', agent: 'quant', icon: null },
   { id: 'audit', key: '5', label: 'Auditor', agent: 'auditor', icon: null },
+  { id: 'net-worth', key: '6', label: 'Net Worth', agent: 'accountant', icon: null },
 ] as const;
 type StationId = (typeof STATIONS)[number]['id'];
 
@@ -197,7 +199,7 @@ export function GameShell() {
     };
   }, [reload]);
 
-  // Hotkeys 1-5 switch stations, except while typing in a form field.
+  // Hotkeys 1-6 switch stations, except while typing in a form field.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -244,6 +246,7 @@ export function GameShell() {
         {station === 'data-health' && <DataHealthPage />}
         {station === 'strategy-lab' && <StrategyLabPage onActivity={announceActivity} />}
         {station === 'audit' && <AuditPage game={game} />}
+        {station === 'net-worth' && <NetWorthPage />}
       </main>
       <Toasts events={toasts} onDismiss={dismiss} />
     </div>

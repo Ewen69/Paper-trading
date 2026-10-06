@@ -566,3 +566,82 @@ export const paperLogSchema = z.object({
   ),
 });
 export type PaperLog = z.infer<typeof paperLogSchema>;
+
+// ---- Net worth (manual entry / CSV only; stays local) ----
+
+export const netWorthAccountSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  kind: z.enum(['asset', 'liability']),
+  category: z.string(),
+  note: z.string(),
+  latest_amount: z.number().nullable(),
+  latest_as_of: isoDate.nullable(),
+  latest_source: z.string().nullable(),
+  age_days: z.number().int().nullable(),
+  stale: z.boolean(),
+});
+export type NetWorthAccount = z.infer<typeof netWorthAccountSchema>;
+
+export const netWorthSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  data_type: z.literal('manual'),
+  stale_after_days: z.number().int(),
+  categories: z.object({ asset: z.array(z.string()), liability: z.array(z.string()) }),
+  accounts: z.array(netWorthAccountSchema),
+  totals: z.object({
+    assets: z.number(),
+    liabilities: z.number(),
+    net_worth: z.number(),
+    as_of: isoDate.nullable(),
+    oldest_included: isoDate.nullable(),
+    missing: z.array(z.string()),
+  }),
+  history: z.array(
+    z.object({
+      as_of: isoDate,
+      assets: z.number(),
+      liabilities: z.number(),
+      net_worth: z.number(),
+      carried_forward: z.number().int(),
+      missing: z.array(z.string()),
+    }),
+  ),
+  method: z.string(),
+});
+export type NetWorth = z.infer<typeof netWorthSchema>;
+export type NetWorthPoint = NetWorth['history'][number];
+
+export const balanceSchema = z.object({
+  id: z.number().int(),
+  account_id: z.number().int(),
+  as_of: isoDate,
+  amount: z.number(),
+  source: z.string(),
+  entered_at: isoDateTime,
+  replaced: z.boolean(),
+});
+export type BalanceEntry = z.infer<typeof balanceSchema>;
+
+export const netWorthImportSchema = z.object({
+  rows: z.number().int(),
+  accounts_created: z.number().int(),
+  inserted: z.number().int(),
+  updated: z.number().int(),
+  source: z.string(),
+});
+
+export const projectionSchema = z.object({
+  as_of: isoDateTime,
+  source: z.string(),
+  start: z.number(),
+  start_as_of: isoDate,
+  years: z.number().int(),
+  low_rate: z.number(),
+  high_rate: z.number(),
+  contribution: z.number(),
+  points: z.array(z.object({ year: z.number().int(), low: z.number(), high: z.number() })),
+  note: z.string(),
+});
+export type Projection = z.infer<typeof projectionSchema>;

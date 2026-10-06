@@ -28,6 +28,8 @@ from ptl.data_api import DataHealthOut, compute_data_health
 from ptl.db import open_db
 from ptl.graduation import GraduationOut, compute_graduation
 from ptl.market_calendar import MarketCalendar
+from ptl.networth import compute as nw_compute
+from ptl.networth import store as nw_store
 from ptl.paper import store as paper_store
 from ptl.paper.store import PaperEvidence
 from ptl.risk import store as risk_store
@@ -142,7 +144,6 @@ class _Locked:
 
 
 LOCKED_AGENTS: tuple[_Locked, ...] = (
-    _Locked("accountant", "Accountant", "Tracks net worth from your manual entries", "Phase 4"),
     _Locked("analyst", "Analyst", "Portfolio allocation, risk and Greeks", "Phase 5"),
     _Locked(
         "lead",
@@ -571,8 +572,64 @@ def _paper_trader(conn: sqlite3.Connection, paper: PaperEvidence, now: datetime)
     )
 
 
+NETWORTH_SOURCE = "Net-worth entries (local SQLite)"
+
+
+def _accountant(conn: sqlite3.Connection, stale_after_days: int, now: datetime) -> AgentOut:
+    """Reports counts and dates only; amounts stay on the Net Worth station."""
+    accounts = nw_store.accounts(conn)
+    balances = nw_store.balances(conn)
+    if not accounts:
+        lines = [
+            ReportLine(
+                text="No accounts yet. Add one by hand or import a CSV.",
+                source=NETWORTH_SOURCE,
+                as_of=now,
+            )
+        ]
+        status: AgentStatus = "idle"
+    else:
+        latest = nw_compute.latest_balances(accounts, balances, now.date(), stale_after_days)
+        newest = max((b.as_of for b in balances), default=None)
+        lines = [
+            ReportLine(
+                text=f"{len(accounts)} account(s), {len(balances)} balance(s). "
+                + (f"Latest entry {newest}." if newest else "No balances entered yet."),
+                source=NETWORTH_SOURCE,
+                as_of=now,
+            )
+        ]
+        stale = [x.account.name for x in latest if x.stale]
+        if stale:
+            lines.append(
+                ReportLine(
+                    text=f"Not updated in {stale_after_days}+ days (or never): "
+                    + ", ".join(stale[:5])
+                    + (f" and {len(stale) - 5} more" if len(stale) > 5 else ""),  # noqa: PLR2004
+                    source=NETWORTH_SOURCE,
+                    as_of=now,
+                )
+            )
+        status = "warning" if stale else "ok"
+    return AgentOut(
+        id="accountant",
+        name="Accountant",
+        role="Tracks net worth from your manual entries and CSV imports",
+        station="net-worth",
+        status=status,
+        unlocks_in=None,
+        xp=0,
+        level=1,
+        report=lines,
+    )
+
+
 def compute_game_state(
-    conn: sqlite3.Connection, health: DataHealthOut, now: datetime
+    conn: sqlite3.Connection,
+    health: DataHealthOut,
+    now: datetime,
+    *,
+    stale_after_days: int = 45,
 ) -> GameStateOut:
     datasets = data_repo.list_datasets(conn)
     clean_ids = {d.id for d in datasets if not data_repo.issues_for(conn, d.id)}
@@ -594,6 +651,7 @@ def compute_game_state(
         _auditor(flags, bool(datasets or runs), now),
         _risk_officer(conn, now),
         _paper_trader(conn, paper, now),
+        _accountant(conn, stale_after_days, now),
         *(
             AgentOut(
                 id=a.id,
@@ -641,6 +699,8 @@ def build_game_router(
         now = clock()
         health = compute_data_health(settings, source, calendar, now)
         with open_db(settings.database_path) as conn:
-            return compute_game_state(conn, health, now)
+            return compute_game_state(
+                conn, health, now, stale_after_days=settings.networth_stale_after_days
+            )
 
     return router
