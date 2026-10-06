@@ -5,6 +5,7 @@ import { HealthCard } from '../components/HealthCard';
 import { Provenance } from '../components/Provenance';
 import { AgentSprite } from './AgentSprite';
 import { AgentTile } from './AgentTile';
+import { GraduationGate } from './GraduationGate';
 import { timeOf } from './status';
 
 const MAX_EVENTS = 15;
@@ -126,7 +127,10 @@ export function HQPage({ game }: { game: ApiState<GameState> }) {
             </div>
           </section>
           <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-            <MissionLog game={game.data} />
+            <div className="space-y-6">
+              <GraduationGate gate={game.data.graduation} />
+              <MissionLog game={game.data} />
+            </div>
             <div className="space-y-6">
               <Badges game={game.data} />
               <XpRules game={game.data} />

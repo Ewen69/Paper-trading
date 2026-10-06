@@ -35,6 +35,24 @@ Next: options backtesting (Phase 2b). See [`docs/PLAN.md`](docs/PLAN.md).
   - Toasts pop when a new event lands.
 - **Truth comes from the backend.** `GET /game/state` computes all of the above from local
   records and the live source check. The UI only renders it.
+- **The Auditor (station 4).** Each backtest's warnings are now stored with a stable code. The
+  Auditor turns them, plus data findings, into standing flags:
+  - small samples and short histories
+  - data gaps and impossible rows
+  - over-tuning and reused holdouts
+  - unadjusted prices
+  - live feed down
+  Each flag shows its severity, source and time, and links to the station that can fix it.
+- **Graduation Gate** on HQ and the Audit station: 3 months of paper trading, 200+ paper
+  trades, beating buy-and-hold on a first out-of-sample test, zero risk breaches.
+  - It **only tracks** and can never enable live trading.
+  - Paper items show "Not started" until Phase 3.
+- **Reality Check first.** It now sits above the chart on every result: headline tiles
+  flagged exactly where the backend raised a warning, then "Auditor says" with the warnings.
+  - A "before you run" callout shows the selected data's lock status, run count and
+    out-of-sample looks.
+
+Details: [`docs/GAME.md`](docs/GAME.md).
 
 ### Phase 2.5 limitations
 
@@ -42,6 +60,8 @@ Next: options backtesting (Phase 2b). See [`docs/PLAN.md`](docs/PLAN.md).
   reviewer come in a later phase (see the plan).
 - XP and badges only cover what the app logs. Paper trading and risk badges arrive with
   Phase 3.
+- Runs logged before this phase have no stored warnings or CIs. The Auditor and the gate treat
+  them as unknown, not clean.
 - Game state refreshes when you switch stations or finish a run; it doesn't poll.
 
 ### What Phase 2a added

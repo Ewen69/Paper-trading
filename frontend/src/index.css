@@ -37,6 +37,8 @@ body::after {
   z-index: 50;
 }
 
+/* In the components layer so Tailwind utilities (e.g. border colors) can override them. */
+@layer components {
 /* Game window: hard edges, inset bevel, glowing corner brackets. */
 .panel {
   position: relative;
@@ -92,6 +94,8 @@ body::after {
     #eab308 6px,
     #eab308 8px
   );
+}
+
 }
 
 @keyframes sprite-bob {

@@ -19,12 +19,14 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import AwareDatetime, BaseModel
 
+from ptl.audit import Flag, compute_flags
 from ptl.backtest import repository as bt_repo
 from ptl.config import Settings
 from ptl.data import repository as data_repo
 from ptl.data.live import Clock, QuoteSource
 from ptl.data_api import DataHealthOut, compute_data_health
 from ptl.db import open_db
+from ptl.graduation import GraduationOut, compute_graduation
 from ptl.market_calendar import MarketCalendar
 
 AgentStatus = Literal["ok", "warning", "error", "idle", "locked"]
@@ -35,6 +37,8 @@ TOO_MANY_COMBINATIONS = 5
 RESTRAINT_MAX_COMBINATIONS = 3
 COST_STRESS_BPS = 10.0
 RUN_LOG_SOURCE = "Backtest run log (local SQLite)"
+AUDIT_SOURCE = "Auditor (data findings and stored backtest warnings)"
+AUDITOR_LINES = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +126,8 @@ class GameStateOut(BaseModel):
     badges: list[BadgeOut]
     xp_rules: list[XpRuleOut]
     xp_policy: str
+    flags: list[Flag]
+    graduation: GraduationOut
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,6 +454,48 @@ def _quant(runs: Sequence[bt_repo.RunRecord], now: datetime, xp: int) -> AgentOu
     )
 
 
+def _auditor(flags: Sequence[Flag], has_material: bool, now: datetime) -> AgentOut:
+    if not has_material:
+        status: AgentStatus = "idle"
+        lines = [ReportLine(text="Nothing to audit yet.", source=AUDIT_SOURCE, as_of=now)]
+    else:
+        severities = {f.severity for f in flags}
+        status = (
+            "error" if "error" in severities else "warning" if "warning" in severities else "ok"
+        )
+        lines = [
+            ReportLine(text=f"{f.title}: {f.summary}", source=f.source, as_of=f.as_of)
+            for f in flags[:AUDITOR_LINES]
+        ]
+        if len(flags) > AUDITOR_LINES:
+            lines.append(
+                ReportLine(
+                    text=f"{len(flags) - AUDITOR_LINES} more flag(s) in the Auditor's station.",
+                    source=AUDIT_SOURCE,
+                    as_of=now,
+                )
+            )
+        if not flags:
+            lines = [
+                ReportLine(
+                    text="No open flags on the current data and latest results.",
+                    source=AUDIT_SOURCE,
+                    as_of=now,
+                )
+            ]
+    return AgentOut(
+        id="auditor",
+        name="Auditor",
+        role="Flags weak evidence: small samples, data gaps, over-tuning, reused holdouts",
+        station="audit",
+        status=status,
+        unlocks_in=None,
+        xp=0,
+        level=1,
+        report=lines,
+    )
+
+
 def compute_game_state(
     conn: sqlite3.Connection, health: DataHealthOut, now: datetime
 ) -> GameStateOut:
@@ -455,6 +503,7 @@ def compute_game_state(
     clean_ids = {d.id for d in datasets if not data_repo.issues_for(conn, d.id)}
     locks = bt_repo.list_locks(conn)
     runs = bt_repo.all_runs(conn)
+    flags = compute_flags(health, runs, bt_repo.warnings_by_run(conn))
 
     events = _events(datasets, locks, runs)
     xp_by_agent: dict[str, int] = defaultdict(int)
@@ -466,6 +515,7 @@ def compute_game_state(
     agents = [
         _scout(health, xp_by_agent["scout"]),
         _quant(runs, now, xp_by_agent["quant"]),
+        _auditor(flags, bool(datasets or runs), now),
         *(
             AgentOut(
                 id=a.id,
@@ -498,6 +548,8 @@ def compute_game_state(
         badges=_badges(datasets, clean_ids, locks, runs),
         xp_rules=[XpRuleOut(id=r.id, description=r.description, xp=r.xp) for r in XP_RULES],
         xp_policy=XP_POLICY,
+        flags=flags,
+        graduation=compute_graduation(runs, now),
     )
 
 

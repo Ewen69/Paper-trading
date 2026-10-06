@@ -203,7 +203,7 @@ export const realityCheckSchema = z.object({
     seed: z.number().int(),
     confidence: z.number(),
   }),
-  warnings: z.array(z.string()),
+  warnings: z.array(z.object({ code: z.string(), text: z.string() })),
 });
 export type RealityCheck = z.infer<typeof realityCheckSchema>;
 
@@ -292,5 +292,38 @@ export const gameStateSchema = z.object({
   ),
   xp_rules: z.array(z.object({ id: z.string(), description: z.string(), xp: z.number().int() })),
   xp_policy: z.string(),
+  flags: z.array(
+    z.object({
+      code: z.string(),
+      severity: z.enum(['error', 'warning', 'info']),
+      title: z.string(),
+      summary: z.string(),
+      source: z.string(),
+      as_of: isoDateTime,
+      station: z.string().nullable(),
+      refs: z.array(z.string()),
+    }),
+  ),
+  graduation: z.object({
+    items: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        requirement: z.string(),
+        status: z.enum(['met', 'not_met', 'not_started']),
+        progress: z.string(),
+        evidence: z.string().nullable(),
+        source: z.string(),
+        as_of: isoDateTime,
+      }),
+    ),
+    met: z.number().int(),
+    total: z.number().int(),
+    note: z.string(),
+    as_of: isoDateTime,
+    source: z.string(),
+  }),
 });
 export type GameState = z.infer<typeof gameStateSchema>;
+export type Flag = GameState['flags'][number];
+export type Graduation = GameState['graduation'];

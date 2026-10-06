@@ -2,7 +2,7 @@
 
 import json
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
@@ -31,6 +31,12 @@ class OosLock:
     oos_fraction: float
     locked_at: datetime
     basis: str
+
+
+@dataclass(frozen=True, slots=True)
+class RunWarning:
+    code: str
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +177,21 @@ def record_run(  # noqa: PLR0913
     if cursor.lastrowid is None:  # pragma: no cover
         raise RuntimeError("run insert returned no id")
     return cursor.lastrowid
+
+
+def record_warnings(conn: sqlite3.Connection, run_id: int, warnings: Sequence[RunWarning]) -> None:
+    with conn:
+        conn.executemany(
+            "INSERT INTO run_warnings (run_id, position, code, text) VALUES (?, ?, ?, ?)",
+            ((run_id, i, w.code, w.text) for i, w in enumerate(warnings)),
+        )
+
+
+def warnings_by_run(conn: sqlite3.Connection) -> dict[int, list[RunWarning]]:
+    found: dict[int, list[RunWarning]] = {}
+    for r in conn.execute("SELECT * FROM run_warnings ORDER BY run_id, position"):
+        found.setdefault(r["run_id"], []).append(RunWarning(r["code"], r["text"]))
+    return found
 
 
 def run_counts(conn: sqlite3.Connection, symbol: str, strategy: str) -> RunCounts:

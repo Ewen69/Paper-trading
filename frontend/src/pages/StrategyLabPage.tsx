@@ -8,6 +8,7 @@ import { EquityChart } from '../components/EquityChart';
 import { MetricsTable } from '../components/MetricsTable';
 import { Provenance } from '../components/Provenance';
 import { RealityCheckPanel } from '../components/RealityCheckPanel';
+import { AgentSprite } from '../game/AgentSprite';
 import { pct, usd } from '../format';
 
 type RunState =
@@ -127,18 +128,8 @@ function LabForm({
                 </option>
               ))}
             </select>
-            {entry && (
-              <span className="mt-1 block text-xs text-slate-500">
-                {entry.sessions.toLocaleString()} sessions ·{' '}
-                {entry.has_adj_close ? 'adjusted prices' : 'raw prices (no dividends)'} ·{' '}
-                {entry.lock
-                  ? `out-of-sample locked from ${entry.lock.oos_start}`
-                  : 'first run will permanently lock the most recent 30% as out-of-sample'}
-                {' · '}
-                {entry.in_sample_runs} in-sample run(s), {entry.oos_evaluations} OOS evaluation(s)
-              </span>
-            )}
           </label>
+          {entry && <BeforeYouRun entry={entry} />}
 
           <label className="block text-sm">
             <span className="mb-1 block text-slate-400">Strategy</span>
@@ -251,6 +242,45 @@ function LabForm({
   );
 }
 
+/** The reality check for the selected data, shown before any run. */
+function BeforeYouRun({ entry }: { entry: UniverseEntry }) {
+  const facts = [
+    `${entry.sessions.toLocaleString()} sessions (${entry.first_date} → ${entry.last_date})`,
+    entry.has_adj_close
+      ? 'adjusted prices (dividends included)'
+      : 'raw prices: dividends excluded, splits look like crashes',
+    entry.lock
+      ? `out-of-sample sealed from ${entry.lock.oos_start}`
+      : 'your first run permanently seals the most recent 30% as out-of-sample',
+    `${String(entry.in_sample_runs)} in-sample run(s) so far`,
+    `out-of-sample looked at ${String(entry.oos_evaluations)} time(s)`,
+  ];
+  return (
+    <div
+      className="flex gap-3 border-2 border-amber-500/40 bg-amber-500/5 p-3 md:col-span-2"
+      aria-label="Reality check before you run"
+    >
+      <div className="shrink-0">
+        <AgentSprite agentId="auditor" size={32} animate={false} />
+      </div>
+      <div className="min-w-0 text-sm">
+        <p className="font-pixel text-[8px] uppercase text-amber-300">
+          Reality check before you run · {entry.symbol}
+        </p>
+        <ul className="mt-1.5 list-inside list-disc text-slate-300">
+          {facts.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+        <p className="mt-1.5 text-[11px] text-slate-500">
+          Source: {entry.source} ({entry.file_name}, dataset #{entry.dataset_id}) and the backtest
+          run log
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function Results({ report }: { report: Report }) {
   const s = report.strategy_metrics;
   const params = Object.entries(report.strategy.params)
@@ -258,6 +288,7 @@ function Results({ report }: { report: Report }) {
     .join(', ');
   return (
     <div className="space-y-6">
+      <RealityCheckPanel report={report} />
       <Card title={`Result #${String(report.run_id)}: ${report.strategy.name} on ${report.symbol}`}>
         <p className="mb-1 text-sm text-slate-300">
           {params || 'no parameters'} · {report.reality_check.period} · {s.trade_count} trades ·
@@ -284,7 +315,6 @@ function Results({ report }: { report: Report }) {
           labels={{ strategy: report.symbol + ' strategy', benchmark: report.benchmark_symbol + ' buy & hold' }}
         />
       </Card>
-      <RealityCheckPanel report={report} />
       <Card title="Metrics">
         <MetricsTable report={report} />
       </Card>

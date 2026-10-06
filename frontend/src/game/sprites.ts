@@ -57,6 +57,18 @@ export const SPRITES: Record<string, SpriteSpec> = {
       [7, 9, 'A'],
     ],
   },
+  auditor: {
+    // Dark suit, white hair, a gold-rimmed magnifying glass in the right hand.
+    palette: { ...BASE, H: '#e5e7eb', S: '#c68642', C: '#334155', D: '#1e293b', W: '#f8fafc', A: '#facc15' },
+    overlay: [
+      [10, 6, 'A'],
+      [9, 7, 'A'],
+      [10, 7, 'G'],
+      [11, 7, 'A'],
+      [10, 8, 'A'],
+      [9, 9, 'A'],
+    ],
+  },
   risk: {
     palette: { ...BASE, H: '#1e3a8a', S: '#c68642', C: '#1e40af', D: '#172554', A: '#facc15' },
     overlay: [

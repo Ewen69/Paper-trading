@@ -108,6 +108,20 @@ MIGRATIONS: tuple[str, ...] = (
     CREATE TRIGGER backtest_runs_no_delete BEFORE DELETE ON backtest_runs
     BEGIN SELECT RAISE(ABORT, 'the backtest run log is append-only'); END;
     """,
+    # 3: warnings each backtest produced, with stable codes, for the Auditor. Append-only.
+    """
+    CREATE TABLE run_warnings (
+        run_id   INTEGER NOT NULL REFERENCES backtest_runs (id),
+        position INTEGER NOT NULL,
+        code     TEXT NOT NULL,
+        text     TEXT NOT NULL,
+        PRIMARY KEY (run_id, position)
+    ) WITHOUT ROWID;
+    CREATE TRIGGER run_warnings_no_update BEFORE UPDATE ON run_warnings
+    BEGIN SELECT RAISE(ABORT, 'run warnings are append-only'); END;
+    CREATE TRIGGER run_warnings_no_delete BEFORE DELETE ON run_warnings
+    BEGIN SELECT RAISE(ABORT, 'run warnings are append-only'); END;
+    """,
 )
 
 

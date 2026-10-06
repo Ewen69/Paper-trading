@@ -1,5 +1,5 @@
 // Fetch is stubbed with test-only fixtures; production code never fabricates data.
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,24 +16,35 @@ const routes = {
 };
 
 describe('StrategyLabPage', () => {
-  it('explains the lock before the first run and defaults to in-sample', async () => {
+  it('shows a reality check before the first run and defaults to in-sample', async () => {
     stubFetch(routes);
     render(<StrategyLabPage />);
-    expect(await screen.findByText(/permanently lock the most recent 30%/)).toBeInTheDocument();
+    const before = await screen.findByLabelText('Reality check before you run');
+    expect(before).toHaveTextContent('permanently seals the most recent 30%');
+    expect(before).toHaveTextContent('0 in-sample run(s) so far');
+    expect(before).toHaveTextContent('Source: Vendor X (spy.csv, dataset #1)');
     expect(screen.getByLabelText('in-sample')).toBeChecked();
     expect(screen.getByLabelText('Fast window')).toHaveValue(50);
   });
 
-  it('runs a backtest and shows the reality check with trial count and CIs', async () => {
+  it('puts the reality check first and flags exactly what the backend flagged', async () => {
     const fetchMock = stubFetch({ ...routes, '/backtest/runs': reportPayload });
     render(<StrategyLabPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Run backtest' }));
 
-    expect(await screen.findByText('Reality check')).toBeInTheDocument();
-    expect(screen.getByText(/3 for this strategy on SPY/)).toBeInTheDocument();
-    expect(screen.getByText(/Only 4 trade\(s\)/)).toBeInTheDocument();
-    expect(screen.getByText(/-1.0% · 95% CI -6.0% to 4.0%/)).toBeInTheDocument();
-    expect(screen.getByText('Backtest on Vendor X (spy.csv, dataset #1)')).toBeInTheDocument();
+    const reality = await screen.findByRole('region', { name: /Reality check: read this first/ });
+    const chart = screen.getByRole('group', { name: /Equity curve/ });
+    // The reality check precedes the chart in reading order.
+    expect(reality.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const tile = (label: string) => within(reality).getByText(label).closest('div');
+    expect(tile('Trades')).toHaveTextContent('⚠ flagged'); // low_trades raised
+    expect(tile('Combinations tried')).toHaveTextContent('⚠ flagged'); // many_trials raised
+    expect(tile('Out-of-sample looks')).not.toHaveTextContent('flagged'); // no oos_repeat
+    expect(within(reality).getByText(/-6.0% to 4.0%/)).toBeInTheDocument();
+    expect(within(reality).getByText('Auditor says')).toBeInTheDocument();
+    expect(within(reality).getByText(/Only 4 trade\(s\)/)).toBeInTheDocument();
+    expect(within(reality).getByText(/Run #7 · Backtest on Vendor X/)).toBeInTheDocument();
     expect(screen.getAllByText(/n\/a \(too little data\)/).length).toBeGreaterThan(0);
 
     expect(fetchMock.mock.calls.some(([input]) => input === '/api/backtest/runs')).toBe(true);

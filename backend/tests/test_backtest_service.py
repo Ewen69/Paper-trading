@@ -134,7 +134,7 @@ def test_trials_are_counted_per_parameter_combination(
     assert again.reality_check.in_sample_runs == 2
     third = service.run(conn, request(two_symbols, params={"fast": 10, "slow": 40}), calendar, NOW)
     assert third.reality_check.parameter_combinations_tried == 2
-    assert any("2 parameter combinations" in w for w in third.reality_check.warnings)
+    assert any("2 parameter combinations" in w.text for w in third.reality_check.warnings)
     hold = service.run(
         conn, request(two_symbols, strategy_id="buy_and_hold", params={}), calendar, NOW
     )
@@ -150,10 +150,10 @@ def test_out_of_sample_evaluations_are_counted_and_warned(
     assert lock is not None
     assert first.reality_check.window_start == lock.oos_start
     assert first.reality_check.oos_evaluations == 1
-    assert not any("evaluated" in w for w in first.reality_check.warnings)
+    assert not any("evaluated" in w.text for w in first.reality_check.warnings)
     second = service.run(conn, request(two_symbols, "out-of-sample"), calendar, NOW)
     assert second.reality_check.oos_evaluations == 2
-    assert any("evaluated 2 times" in w for w in second.reality_check.warnings)
+    assert any("evaluated 2 times" in w.text for w in second.reality_check.warnings)
 
 
 def test_locks_and_run_log_are_permanent(
@@ -209,7 +209,7 @@ def test_raw_prices_are_flagged(
     report = service.run(conn, request(dataset), calendar, NOW)
     assert report.reality_check.price_basis == "raw"
     assert report.benchmark_symbol == "QQQ"  # no SPY in the dataset: buy-and-hold of itself
-    assert any("raw prices" in w for w in report.reality_check.warnings)
+    assert any("raw prices" in w.text for w in report.reality_check.warnings)
 
 
 def test_benchmark_must_cover_the_window(
@@ -270,5 +270,20 @@ def test_report_compares_with_benchmark_after_costs(
     assert rc.bootstrap.seed == 20251005
     assert rc.bootstrap.resamples == 2000
     assert rc.costs.slippage_bps == 5.0
-    assert any("needs 20 sessions" in w for w in rc.warnings)
+    assert any("needs 20 sessions" in w.text for w in rc.warnings)
     assert report.provenance.source.startswith("Backtest on synthetic")
+
+
+def test_warnings_are_stored_with_codes_and_permanent(
+    conn: sqlite3.Connection, calendar: MarketCalendar, two_symbols: int
+) -> None:
+    report = service.run(conn, request(two_symbols), calendar, NOW)
+    stored = repo.warnings_by_run(conn)[report.run_id]
+    assert [w.code for w in stored] == [w.code for w in report.reality_check.warnings]
+    assert {"warmup_cash", "low_trades"} <= {w.code for w in stored}
+    with pytest.raises(sqlite3.DatabaseError, match="append-only"):
+        conn.execute("DELETE FROM run_warnings")
+    summary = repo.all_runs(conn)[-1].summary
+    ci = report.excess_annualized_return.ci95
+    assert ci is not None
+    assert (summary["excess_ci_low"], summary["excess_ci_high"]) == (ci.low, ci.high)

@@ -203,7 +203,16 @@ export const reportPayload = {
       seed: 20251005,
       confidence: 0.95,
     },
-    warnings: ['Only 4 trade(s). Win rate and expectancy are unreliable below 30 trades.'],
+    warnings: [
+      {
+        code: 'low_trades',
+        text: 'Only 4 trade(s). Win rate and expectancy are unreliable below 30 trades.',
+      },
+      {
+        code: 'many_trials',
+        text: '3 parameter combinations of this strategy have been tried on SPY in-sample.',
+      },
+    ],
   },
   provenance: {
     source: 'Backtest on Vendor X (spy.csv, dataset #1)',

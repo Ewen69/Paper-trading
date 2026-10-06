@@ -7,6 +7,7 @@ import { DataHealthPage } from '../pages/DataHealthPage';
 import { StrategyLabPage } from '../pages/StrategyLabPage';
 import { ACTIVITY_EVENT, announceActivity } from './activity';
 import { AgentSprite } from './AgentSprite';
+import { AuditPage } from './AuditPage';
 import { HQPage } from './HQPage';
 import { timeOf } from './status';
 import { StatusChip } from './StatusChip';
@@ -15,6 +16,7 @@ const STATIONS = [
   { id: 'hq', key: '1', label: 'HQ', agent: null },
   { id: 'data-health', key: '2', label: 'Data Scout', agent: 'scout' },
   { id: 'strategy-lab', key: '3', label: 'Quant', agent: 'quant' },
+  { id: 'audit', key: '4', label: 'Auditor', agent: 'auditor' },
 ] as const;
 type StationId = (typeof STATIONS)[number]['id'];
 
@@ -238,6 +240,7 @@ export function GameShell() {
         {station !== 'hq' && <StationHeader agent={stationAgent} />}
         {station === 'data-health' && <DataHealthPage />}
         {station === 'strategy-lab' && <StrategyLabPage onActivity={announceActivity} />}
+        {station === 'audit' && <AuditPage game={game} />}
       </main>
       <Toasts events={toasts} onDismiss={dismiss} />
     </div>

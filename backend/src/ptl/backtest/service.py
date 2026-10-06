@@ -36,8 +36,9 @@ from ptl.backtest.report import (
     RealityCheck,
     StrategyRef,
     TradeOut,
+    WarningOut,
 )
-from ptl.backtest.repository import OosLock, Period
+from ptl.backtest.repository import OosLock, Period, RunWarning
 from ptl.backtest.strategies import STRATEGIES, BuyAndHold
 from ptl.data import repository as data_repo
 from ptl.data.models import DatasetKind, EquityBar, Severity
@@ -177,7 +178,9 @@ def _window(bars: list[EquityBar], lock: OosLock, period: Period) -> _Window:
     return _Window(bars, start)
 
 
-def _quality_gate(bars: Sequence[EquityBar], calendar: MarketCalendar, label: str) -> list[str]:
+def _quality_gate(
+    bars: Sequence[EquityBar], calendar: MarketCalendar, label: str
+) -> list[RunWarning]:
     issues = check_equity_bars(bars, calendar)
     errors = [i for i in issues if i.severity is Severity.ERROR]
     if errors:
@@ -187,7 +190,10 @@ def _quality_gate(bars: Sequence[EquityBar], calendar: MarketCalendar, label: st
             f"it: {listed}. Fix or replace the data and import it again."
         )
     return [
-        f"{label} data: {i.check} x{i.count} ({i.first_date}..{i.last_date}). {i.detail}"
+        RunWarning(
+            "data_quality",
+            f"{label} data: {i.check} x{i.count} ({i.first_date}..{i.last_date}). {i.detail}",
+        )
         for i in issues
         if i.severity is Severity.WARNING
     ]
@@ -293,54 +299,69 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
             "max_drawdown": s_perf.max_drawdown,
             "trades": s_perf.trade_count,
             "excess_annualized_return": excess.value,
+            "excess_ci_low": excess.ci.low if excess.ci else None,
+            "excess_ci_high": excess.ci.high if excess.ci else None,
+            "sessions": s_perf.sessions,
         },
     )
     counts = repo.run_counts(conn, symbol, spec.id)
 
-    # Warnings: each one is traceable to a number in this report.
+    # Warnings: each one is traceable to a number in this report, and is stored with a
+    # stable code so the Auditor can surface it later.
+    def warn(code: str, text: str) -> None:
+        warnings.append(RunWarning(code, text))
+
     if window.start < strategy.warmup:
-        warnings.append(
+        warn(
+            "warmup_cash",
             f"The strategy needs {strategy.warmup} sessions of history before its first "
             f"signal. It held cash for about the first {strategy.warmup - window.start} sessions "
-            "of this window, while the benchmark was invested."
+            "of this window, while the benchmark was invested.",
         )
     if s_perf.trade_count < LOW_TRADE_COUNT:
-        warnings.append(
+        warn(
+            "low_trades",
             f"Only {s_perf.trade_count} trade(s). Win rate and expectancy are unreliable below "
-            f"{LOW_TRADE_COUNT} trades."
+            f"{LOW_TRADE_COUNT} trades.",
         )
     if s_perf.sessions < ONE_YEAR_SESSIONS:
-        warnings.append(f"Only {s_perf.sessions} sessions (under one year of data).")
+        warn("short_sample", f"Only {s_perf.sessions} sessions (under one year of data).")
     if excess.ci is None:
-        warnings.append("Too few sessions for a confidence interval on excess return.")
+        warn("no_ci", "Too few sessions for a confidence interval on excess return.")
     elif excess.ci.contains(0.0):
-        warnings.append(
+        warn(
+            "ci_includes_zero",
             f"The 95% CI for annualized excess return vs {bench_symbol} is "
             f"{_pct(excess.ci.low)} to {_pct(excess.ci.high)}. It includes 0, so this backtest "
-            "does not distinguish the strategy from buy-and-hold."
+            "does not distinguish the strategy from buy-and-hold.",
         )
     if request.period == "in-sample" and counts.in_sample_combinations_this_strategy > 1:
-        warnings.append(
+        warn(
+            "many_trials",
             f"{counts.in_sample_combinations_this_strategy} parameter combinations of this "
             f"strategy have been tried on {symbol} in-sample. The best of several tries is "
-            "biased upward; judge it on out-of-sample data."
+            "biased upward; judge it on out-of-sample data.",
         )
     if request.period == "out-of-sample" and counts.oos_evaluations > 1:
-        warnings.append(
+        warn(
+            "oos_repeat",
             f"The out-of-sample period for {symbol} has now been evaluated "
-            f"{counts.oos_evaluations} times. Each look makes it less of a clean holdout."
+            f"{counts.oos_evaluations} times. Each look makes it less of a clean holdout.",
         )
     if basis == "raw":
-        warnings.append(
+        warn(
+            "raw_prices",
             f"{symbol} uses raw prices (no adj_close column), so dividends are excluded and "
-            "splits look like crashes."
+            "splits look like crashes.",
         )
     if basis != bench_basis:
-        warnings.append(
+        warn(
+            "basis_mismatch",
             f"Strategy uses {basis} prices but the benchmark uses {bench_basis} prices, which "
-            "biases the comparison."
+            "biases the comparison.",
         )
 
+    repo.record_warnings(conn, run_id, warnings)
     info = bootstrap_info(len(s_ret))
     return BacktestReport(
         run_id=run_id,
@@ -379,7 +400,7 @@ def run(  # noqa: PLR0912, PLR0915 - a linear recipe; splitting it would hide th
                 seed=info.seed,
                 confidence=info.confidence,
             ),
-            warnings=warnings,
+            warnings=[WarningOut(code=w.code, text=w.text) for w in warnings],
         ),
         provenance=Provenance(
             source=f"Backtest on {dataset.source} ({dataset.file_name}, dataset #{dataset.id})",

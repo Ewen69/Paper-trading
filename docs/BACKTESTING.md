@@ -101,6 +101,12 @@ Every warning comes from a number in the same report:
 
 **Error-level data problems** (impossible OHLC, non-positive prices) block the run outright.
 
+Each warning is **stored with its run** in the append-only `run_warnings` table, under a stable
+code: `low_trades`, `short_sample`, `no_ci`, `ci_includes_zero`, `many_trials`, `oos_repeat`,
+`raw_prices`, `basis_mismatch`, `warmup_cash` or `data_quality`. The run summary also stores
+the excess-return CI. The Auditor and the Graduation Gate read both; see
+[GAME.md](GAME.md).
+
 ## Limitations
 
 - Daily bars only, one asset per strategy, long only. Options arrive in Phase 2b.

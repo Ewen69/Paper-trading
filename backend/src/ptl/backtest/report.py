@@ -112,6 +112,11 @@ class BootstrapOut(BaseModel):
     confidence: float
 
 
+class WarningOut(BaseModel):
+    code: str  # stable identifier, e.g. low_trades, many_trials, oos_repeat
+    text: str
+
+
 class RealityCheck(BaseModel):
     """What a reader needs before trusting any number above it."""
 
@@ -135,7 +140,7 @@ class RealityCheck(BaseModel):
     cash_yield: str
     sharpe_risk_free: str
     bootstrap: BootstrapOut
-    warnings: list[str]
+    warnings: list[WarningOut]
 
 
 class StrategyRef(BaseModel):
